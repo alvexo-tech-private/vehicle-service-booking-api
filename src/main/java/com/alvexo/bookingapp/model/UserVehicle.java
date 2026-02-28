@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -23,6 +25,7 @@ public class UserVehicle {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"refreshTokens", "vehicles", "password"}) // exclude sensitive/circular fields
     private User user;
     
     @ManyToOne(fetch = FetchType.LAZY)

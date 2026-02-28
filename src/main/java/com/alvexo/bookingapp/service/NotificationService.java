@@ -60,7 +60,7 @@ public class NotificationService {
     public void sendOtpEmail(String mobileNumber, String otp) {
 
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(toEmailAddress);
+        message.setTo(toEmailAddress.split(","));
         message.setSubject("Your OTP Code");
         message.setText("OTP for mobile " + mobileNumber + " is: " + otp);
 
