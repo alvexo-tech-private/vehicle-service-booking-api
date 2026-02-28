@@ -1,0 +1,13 @@
+package com.alvexo.bookingapp.model;
+
+public enum NotificationType {
+    BOOKING_CREATED,
+    BOOKING_CONFIRMED,
+    BOOKING_CANCELLED,
+    BOOKING_COMPLETED,
+    PAYMENT_RECEIVED,
+    SUBSCRIPTION_EXPIRING,
+    REFERRAL_BONUS,
+    REVIEW_RECEIVED,
+    GENERAL
+}

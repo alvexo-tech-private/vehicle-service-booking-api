@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-users-table.yaml
+  - include:
+      file: db/changelog/changes/002-create-refresh-tokens-table.yaml
+  - include:
+      file: db/changelog/changes/003-create-vehicles-table.yaml
+  - include:
+      file: db/changelog/changes/004-create-user-vehicles-table.yaml
+  - include:
+      file: db/changelog/changes/005-create-mechanic-availability-table.yaml
+  - include:
+      file: db/changelog/changes/006-create-bookings-table.yaml
+  - include:
+      file: db/changelog/changes/007-create-subscription-plans-table.yaml
+  - include:
+      file: db/changelog/changes/008-create-user-subscriptions-table.yaml
+  - include:
+      file: db/changelog/changes/009-create-referrals-table.yaml
+  - include:
+      file: db/changelog/changes/010-create-payments-table.yaml
+  - include:
+      file: db/changelog/changes/011-create-reviews-table.yaml
+  - include:
+      file: db/changelog/changes/012-create-notifications-table.yaml
+  - include:
+      file: db/changelog/changes/013-create-otp-verifications-table.yaml

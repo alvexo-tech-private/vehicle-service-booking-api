@@ -1,0 +1,104 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-create-user-subscriptions-table
+      author: system
+      changes:
+        - createTable:
+            tableName: user_subscriptions
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: subscription_plan_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: start_date
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: end_date
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: auto_renew
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: bookings_used
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: stripe_subscription_id
+                  type: VARCHAR(255)
+              - column:
+                  name: cancelled_at
+                  type: TIMESTAMP
+              - column:
+                  name: cancellation_reason
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: user_subscriptions
+            baseColumnNames: user_id
+            constraintName: fk_user_subscriptions_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: user_subscriptions
+            baseColumnNames: subscription_plan_id
+            constraintName: fk_user_subscriptions_plan
+            referencedTableName: subscription_plans
+            referencedColumnNames: id
+        - createIndex:
+            indexName: idx_user_subscriptions_user
+            tableName: user_subscriptions
+            columns:
+              - column:
+                  name: user_id
+        - createIndex:
+            indexName: idx_user_subscriptions_status
+            tableName: user_subscriptions
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            indexName: idx_user_subscriptions_dates
+            tableName: user_subscriptions
+            columns:
+              - column:
+                  name: start_date
+              - column:
+                  name: end_date

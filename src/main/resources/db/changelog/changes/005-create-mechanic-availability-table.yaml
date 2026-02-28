@@ -1,0 +1,78 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-create-mechanic-availability-table
+      author: system
+      changes:
+        - createTable:
+            tableName: mechanic_availability
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: day_of_week
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: start_time
+                  type: TIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: end_time
+                  type: TIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_available
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: slot_duration_minutes
+                  type: INT
+                  defaultValueNumeric: 60
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_availability
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_availability_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            indexName: idx_mechanic_availability_mechanic
+            tableName: mechanic_availability
+            columns:
+              - column:
+                  name: mechanic_id
+        - createIndex:
+            indexName: idx_mechanic_availability_day
+            tableName: mechanic_availability
+            columns:
+              - column:
+                  name: day_of_week
