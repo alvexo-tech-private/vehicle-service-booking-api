@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mail.SimpleMailMessage;
@@ -25,6 +26,9 @@ public class NotificationService {
     
     @Autowired
     private JavaMailSender mailSender;
+    
+    @Value("${app.toemail.address:info@alvexotech.com}")
+    private String toEmailAddress;
     
     @Transactional
     public Notification createNotification(User user, String title, String message, 
@@ -56,7 +60,7 @@ public class NotificationService {
     public void sendOtpEmail(String mobileNumber, String otp) {
 
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo("");
+        message.setTo(toEmailAddress);
         message.setSubject("Your OTP Code");
         message.setText("OTP for mobile " + mobileNumber + " is: " + otp);
 
