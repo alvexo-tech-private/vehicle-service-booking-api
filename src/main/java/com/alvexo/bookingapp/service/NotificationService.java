@@ -1,5 +1,6 @@
 package com.alvexo.bookingapp.service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,6 +18,13 @@ import com.alvexo.bookingapp.model.Notification;
 import com.alvexo.bookingapp.model.NotificationType;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.NotificationRepository;
+import com.sendgrid.Method;
+import com.sendgrid.Request;
+import com.sendgrid.Response;
+import com.sendgrid.SendGrid;
+import com.sendgrid.helpers.mail.Mail;
+import com.sendgrid.helpers.mail.objects.Content;
+import com.sendgrid.helpers.mail.objects.Email;
 
 @Service
 public class NotificationService {
@@ -29,6 +37,12 @@ public class NotificationService {
     
     @Value("${app.toemail.address:info@alvexotech.com}")
     private String toEmailAddress;
+    
+    @Value("${sendgrid.api.key}")
+    private String sendGridApiKey;
+
+    @Value("${app.from.email}")
+    private String fromEmail;
     
     @Transactional
     public Notification createNotification(User user, String title, String message, 
@@ -57,7 +71,7 @@ public class NotificationService {
         return notificationRepository.countByUserAndIsReadFalse(user);
     }
     
-    public void sendOtpEmail(String mobileNumber, String otp) {
+    public void sendOtpEmailOld(String mobileNumber, String otp) {
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmailAddress.split(","));
@@ -65,6 +79,32 @@ public class NotificationService {
         message.setText("OTP for mobile " + mobileNumber + " is: " + otp);
 
         mailSender.send(message);
+    }
+    
+    public void sendOtpEmail(String mobileNumber, String otp)   {
+
+        Email from = new Email(fromEmail);
+        Email toEmail = new Email(toEmailAddress);
+
+        Content emailContent = new Content("text/plain", "OTP for mobile " + mobileNumber + " is: " + otp);
+        Mail mail = new Mail(from, "Your OTP Code", toEmail, emailContent);
+
+        SendGrid sg = new SendGrid(sendGridApiKey);
+        Request request = new Request();
+
+        request.setMethod(Method.POST);
+        request.setEndpoint("mail/send");
+        Response response=null;
+        try {
+			request.setBody(mail.build());
+			response = sg.api(request);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+
+        System.out.println("Status Code: " + response.getStatusCode());
     }
     
     @Transactional
