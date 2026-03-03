@@ -86,8 +86,8 @@ public class NotificationService {
         Email from = new Email(fromEmail);
         Email toEmail = new Email(toEmailAddress);
 
-        Content emailContent = new Content("text/plain", "OTP for mobile " + mobileNumber + " is: " + otp);
-        Mail mail = new Mail(from, "Your OTP Code", toEmail, emailContent);
+        Content emailContent = new Content("text/plain", "OTP for mobile number " + mobileNumber + " is: " + otp);
+        Mail mail = new Mail(from, "Your OTP Code for "+mobileNumber, toEmail, emailContent);
 
         SendGrid sg = new SendGrid(sendGridApiKey);
         Request request = new Request();
