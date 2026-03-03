@@ -75,8 +75,8 @@ public class NotificationService {
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmailAddress.split(","));
-        message.setSubject("Your OTP Code");
-        message.setText("OTP for mobile " + mobileNumber + " is: " + otp);
+        message.setSubject("Your OTP Code for "+mobileNumber);
+        message.setText("OTP for Code mobile Number: " + mobileNumber + " is: " + otp);
 
         mailSender.send(message);
     }
