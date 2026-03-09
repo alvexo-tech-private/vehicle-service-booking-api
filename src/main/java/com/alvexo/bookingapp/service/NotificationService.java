@@ -107,7 +107,6 @@ public class NotificationService {
 			request.setBody(mail.build());
 			response = sg.api(request);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
