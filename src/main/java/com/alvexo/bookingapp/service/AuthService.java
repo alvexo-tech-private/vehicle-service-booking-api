@@ -1,6 +1,8 @@
 package com.alvexo.bookingapp.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -24,38 +26,39 @@ import com.alvexo.bookingapp.repository.RefreshTokenRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.security.JwtTokenProvider;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
 @Service
 public class AuthService {
     
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
-    
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    
-    @Autowired
-    private AuthenticationManager authenticationManager;
-    
-    @Autowired
-    private JwtTokenProvider tokenProvider;
-    
-    @Autowired
-    private ReferralService referralService;
-    
-    @Autowired
-    private OtpServicebkp otpService;
+	private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider tokenProvider;
+    private final ReferralService referralService;
+    private final OtpServicebkp otpService;
+    private final RedisOtpService redisOtpService;
+    private final NotificationService notificationService;
 
-    @Autowired
-    private RedisOtpService redisOtpService;
-
-    @Autowired
-    private NotificationService notificationService;
+    public AuthService(
+            UserRepository userRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            PasswordEncoder passwordEncoder,
+            AuthenticationManager authenticationManager,
+            JwtTokenProvider tokenProvider,
+            ReferralService referralService,
+            OtpServicebkp otpService,
+            RedisOtpService redisOtpService,
+            NotificationService notificationService) {
+        this.userRepository = userRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.tokenProvider = tokenProvider;
+        this.referralService = referralService;
+        this.otpService = otpService;
+        this.redisOtpService = redisOtpService;
+        this.notificationService = notificationService;
+    }
     
     @Transactional
     public TokenResponse register(RegisterRequest request) {
