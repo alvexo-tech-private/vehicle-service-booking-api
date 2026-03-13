@@ -1,6 +1,8 @@
 package com.alvexo.bookingapp.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -10,28 +12,34 @@ import com.alvexo.bookingapp.dto.request.BookingRequest;
 import com.alvexo.bookingapp.dto.response.BookingResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
-import com.alvexo.bookingapp.model.*;
+import com.alvexo.bookingapp.model.Booking;
+import com.alvexo.bookingapp.model.BookingStatus;
+import com.alvexo.bookingapp.model.NotificationType;
+import com.alvexo.bookingapp.model.User;
+import com.alvexo.bookingapp.model.UserRole;
+import com.alvexo.bookingapp.model.Vehicle;
 import com.alvexo.bookingapp.repository.BookingRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.repository.VehicleRepository;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
 @Service
 public class BookingService {
-    
-    @Autowired
-    private BookingRepository bookingRepository;
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private VehicleRepository vehicleRepository;
-    
-    @Autowired
-    private NotificationService notificationService;
+
+    private final BookingRepository bookingRepository;
+    private final UserRepository userRepository;
+    private final VehicleRepository vehicleRepository;
+    private final NotificationService notificationService;
+
+    public BookingService(
+            BookingRepository bookingRepository,
+            UserRepository userRepository,
+            VehicleRepository vehicleRepository,
+            NotificationService notificationService) {
+        this.bookingRepository = bookingRepository;
+        this.userRepository = userRepository;
+        this.vehicleRepository = vehicleRepository;
+        this.notificationService = notificationService;
+    }
     
     @Transactional
     public BookingResponse createBooking(BookingRequest request, User vehicleUser) {
