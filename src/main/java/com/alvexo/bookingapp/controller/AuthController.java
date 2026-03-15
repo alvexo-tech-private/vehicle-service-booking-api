@@ -11,10 +11,15 @@ import com.alvexo.bookingapp.dto.request.MobileRegisterRequest;
 import com.alvexo.bookingapp.dto.request.RefreshTokenRequest;
 import com.alvexo.bookingapp.dto.request.RegisterRequest;
 import com.alvexo.bookingapp.dto.request.SendOtpRequest;
+import com.alvexo.bookingapp.dto.request.VehicleUserRegisterRequest;
+import com.alvexo.bookingapp.dto.request.WorkshopMechanicRegisterRequest;
 import com.alvexo.bookingapp.dto.request.VerifyOtpRequest;
 import com.alvexo.bookingapp.dto.response.ApiResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
+import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.service.AuthService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -76,6 +81,37 @@ public class AuthController {
 		TokenResponse token = authService.verifyOtpAndLogin(request);
 
 		return ResponseEntity.ok(ApiResponse.success("Login successful", token));
+	}
+
+	/**
+	 * Endpoint 1: Returns the list of available user types (VEHICLE_USER, MECHANIC).
+	 */
+	@GetMapping("/user-types")
+	public ResponseEntity<ApiResponse<List<UserRole>>> getUserTypes() {
+		List<UserRole> userTypes = authService.getUserTypes();
+		return ResponseEntity.ok(ApiResponse.success("User types retrieved successfully", userTypes));
+	}
+
+	/**
+	 * Endpoint 2: Register a new vehicle user.
+	 * Fields: name, mobileNumber, email, city, area (optional), pin (4-digit).
+	 */
+	@PostMapping("/register/vehicle-user")
+	public ResponseEntity<ApiResponse<TokenResponse>> registerVehicleUser(
+			@Valid @RequestBody VehicleUserRegisterRequest request) {
+		TokenResponse response = authService.registerVehicleUser(request);
+		return ResponseEntity.ok(ApiResponse.success("Vehicle user registered successfully", response));
+	}
+
+	/**
+	 * Endpoint 3: Register a new workshop mechanic.
+	 * Fields: name, mobileNumber, email, city, area (optional), pin (4-digit), workshopName.
+	 */
+	@PostMapping("/register/workshop-mechanic")
+	public ResponseEntity<ApiResponse<TokenResponse>> registerWorkshopMechanic(
+			@Valid @RequestBody WorkshopMechanicRegisterRequest request) {
+		TokenResponse response = authService.registerWorkshopMechanic(request);
+		return ResponseEntity.ok(ApiResponse.success("Workshop mechanic registered successfully", response));
 	}
 
 }

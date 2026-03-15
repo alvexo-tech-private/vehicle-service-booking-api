@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/changes/012-create-notifications-table.yaml
   - include:
       file: db/changelog/changes/013-create-otp-verifications-table.yaml
+  - include:
+      file: db/changelog/changes/014-add-area-workshopname-to-users.yaml

@@ -39,6 +39,8 @@ public class VehicleController {
     @Autowired
     private UserRepository userRepository;
     
+    
+    
     @PostMapping
     public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody VehicleRequest request,Authentication authentication) {
@@ -63,4 +65,6 @@ public class VehicleController {
         VehicleResponse vehicle = vehicleService.getVehicleById(id);
         return ResponseEntity.ok(ApiResponse.success(vehicle));
     }
+
+	
 }

@@ -15,6 +15,8 @@ import com.alvexo.bookingapp.dto.request.MobileLoginRequest;
 import com.alvexo.bookingapp.dto.request.MobileRegisterRequest;
 import com.alvexo.bookingapp.dto.request.RefreshTokenRequest;
 import com.alvexo.bookingapp.dto.request.RegisterRequest;
+import com.alvexo.bookingapp.dto.request.VehicleUserRegisterRequest;
+import com.alvexo.bookingapp.dto.request.WorkshopMechanicRegisterRequest;
 import com.alvexo.bookingapp.dto.request.VerifyOtpRequest;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
@@ -25,6 +27,7 @@ import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.repository.RefreshTokenRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.security.JwtTokenProvider;
+import com.alvexo.bookingapp.util.MobileNumberUtil;
 
 @Service
 public class AuthService {
@@ -65,14 +68,16 @@ public class AuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email already registered");
         }
-        
-        if (userRepository.existsByMobileNumber(request.getMobileNumber())) {
+
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        if (userRepository.existsByMobileNumber(mobile)) {
             throw new BadRequestException("Mobile number already registered");
         }
         
         User user = User.builder()
                 .email(request.getEmail())
-                .mobileNumber(request.getMobileNumber())
+                .mobileNumber(mobile)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -109,12 +114,14 @@ public class AuthService {
     @Transactional
     public TokenResponse registerWithMobile(MobileRegisterRequest request) {
 
-        if (userRepository.existsByMobileNumber(request.getMobileNumber())) {
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        if (userRepository.existsByMobileNumber(mobile)) {
             throw new BadRequestException("Mobile number already registered");
         }
 
         User user = User.builder()
-                .mobileNumber(request.getMobileNumber())
+                .mobileNumber(mobile)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -130,14 +137,16 @@ public class AuthService {
     @Transactional
     public TokenResponse loginWithMobile(MobileLoginRequest request) {
 
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getMobileNumber(),
+                        mobile,
                         request.getPassword()
                 )
         );
 
-        User user = userRepository.findByMobileNumber(request.getMobileNumber())
+        User user = userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
         if (!user.getActive()) {
@@ -146,33 +155,41 @@ public class AuthService {
 
         return createTokenResponse(user, request.getDeviceId(), request.getDeviceType());
     }
+    
     @Transactional
     public void sendOtp(String mobileNumber) {
 
-        User user = userRepository.findByMobileNumber(mobileNumber)
+        String mobile = MobileNumberUtil.normalize(mobileNumber);
+
+        User user = userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String otp = otpService.generateAndSaveOtp(mobileNumber);
+        String otp = otpService.generateAndSaveOtp(mobile);
 
-        notificationService.sendOtpEmail(mobileNumber, otp);
+        notificationService.sendOtpEmail(mobile, otp);
     }
+    
     @Transactional
     public void sendOtpRedis(String mobileNumber) {
 
-        User user = userRepository.findByMobileNumber(mobileNumber)
+        String mobile = MobileNumberUtil.normalize(mobileNumber);
+
+        User user = userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String otp = redisOtpService.generateOtp(mobileNumber);
+        String otp = redisOtpService.generateOtp(mobile);
 
-        notificationService.sendOtpEmail(mobileNumber, otp);
+        notificationService.sendOtpEmail(mobile, otp);
     }
 
     @Transactional
     public TokenResponse verifyOtpAndLogin(VerifyOtpRequest request) {
 
-        otpService.validateOtp(request.getMobileNumber(), request.getOtp());
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
 
-        User user = userRepository.findByMobileNumber(request.getMobileNumber())
+        otpService.validateOtp(mobile, request.getOtp());
+
+        User user = userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return createTokenResponse(user, request.getDeviceId(), request.getDeviceType());
@@ -181,12 +198,11 @@ public class AuthService {
     @Transactional
     public TokenResponse verifyOtpAndLoginDB(VerifyOtpRequest request) {
 
-        redisOtpService.validateOtp(
-                request.getMobileNumber(),
-                request.getOtp()
-        );
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
 
-        User user = userRepository.findByMobileNumber(request.getMobileNumber())
+        redisOtpService.validateOtp(mobile, request.getOtp());
+
+        User user = userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return createTokenResponse(user);
@@ -200,9 +216,15 @@ public class AuthService {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
-        
-        User user = userRepository.findByEmail(request.getUsername())
-                .or(() -> userRepository.findByMobileNumber(request.getUsername()))
+
+        // If the username looks like a phone number (no @), normalise it before lookup
+        String username = request.getUsername();
+        String normalizedUsername = !username.contains("@")
+                ? MobileNumberUtil.normalize(username)
+                : username;
+
+        User user = userRepository.findByEmail(normalizedUsername)
+                .or(() -> userRepository.findByMobileNumber(normalizedUsername))
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
         
         if (!user.getActive()) {
@@ -281,6 +303,76 @@ public class AuthService {
                 .build();
     }
     
+    /**
+     * Returns the list of user types available for registration.
+     */
+    public java.util.List<UserRole> getUserTypes() {
+        return java.util.Arrays.asList(UserRole.VEHICLE_USER, UserRole.MECHANIC);
+    }
+
+    /**
+     * Registers a vehicle user with name, mobile number, email, city, area (optional), and 4-digit PIN.
+     */
+    @Transactional
+    public TokenResponse registerVehicleUser(VehicleUserRegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email already registered");
+        }
+
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        if (userRepository.existsByMobileNumber(mobile)) {
+            throw new BadRequestException("Mobile number already registered");
+        }
+
+        User user = User.builder()
+                .firstName(request.getName())
+                .lastName("")
+                .mobileNumber(mobile)
+                .email(request.getEmail())
+                .city(request.getCity())
+                .area(request.getArea())
+                .password(passwordEncoder.encode(request.getPin()))
+                .role(UserRole.VEHICLE_USER)
+                .active(true)
+                .build();
+
+        user = userRepository.save(user);
+        return createTokenResponse(user);
+    }
+
+    /**
+     * Registers a workshop mechanic with name, mobile number, email, city, area (optional), 4-digit PIN, and workshop name.
+     */
+    @Transactional
+    public TokenResponse registerWorkshopMechanic(WorkshopMechanicRegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email already registered");
+        }
+
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        if (userRepository.existsByMobileNumber(mobile)) {
+            throw new BadRequestException("Mobile number already registered");
+        }
+
+        User user = User.builder()
+                .firstName(request.getName())
+                .lastName("")
+                .mobileNumber(mobile)
+                .email(request.getEmail())
+                .city(request.getCity())
+                .area(request.getArea())
+                .password(passwordEncoder.encode(request.getPin()))
+                .workshopName(request.getWorkshopName())
+                .role(UserRole.MECHANIC)
+                .active(true)
+                .build();
+
+        user = userRepository.save(user);
+        return createTokenResponse(user);
+    }
+
     private String generateUniqueReferralCode() {
         String code;
         do {

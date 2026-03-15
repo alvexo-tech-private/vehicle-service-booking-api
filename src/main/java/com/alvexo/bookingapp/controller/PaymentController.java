@@ -1,12 +1,17 @@
 package com.alvexo.bookingapp.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.math.BigDecimal;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.alvexo.bookingapp.dto.response.ApiResponse;
 import com.alvexo.bookingapp.dto.response.PaymentResponse;
@@ -16,19 +21,23 @@ import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.PaymentService;
 
-import java.math.BigDecimal;
-
 @RestController
 @RequestMapping("/api/payments")
 public class PaymentController {
     
-    @Autowired
-    private PaymentService paymentService;
+    private final PaymentService paymentService;
     
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
     
-    @PostMapping("/create")
+    
+    
+    public PaymentController(PaymentService paymentService, UserRepository userRepository) {
+		super();
+		this.paymentService = paymentService;
+		this.userRepository = userRepository;
+	}
+
+	@PostMapping("/create")
     public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(
             @RequestParam PaymentType paymentType,
             @RequestParam Long relatedEntityId,
