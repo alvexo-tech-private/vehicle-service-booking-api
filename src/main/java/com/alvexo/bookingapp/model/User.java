@@ -82,6 +82,13 @@ public class User {
     @Column(precision = 11, scale = 8)
     private BigDecimal longitude;
     
+    // Workshop mechanic-specific fields
+    @Column(name = "workshop_name")
+    private String workshopName;
+
+    // Area within city (optional)
+    private String area;
+
     // Mechanic-specific fields
     private String specialization;
     
