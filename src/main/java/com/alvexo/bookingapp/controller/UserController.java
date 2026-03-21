@@ -1,5 +1,10 @@
 package com.alvexo.bookingapp.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,13 +13,14 @@ import org.springframework.web.bind.annotation.*;
 
 import com.alvexo.bookingapp.dto.request.ChangePinRequest;
 import com.alvexo.bookingapp.dto.request.UserUpdateRequest;
-import com.alvexo.bookingapp.dto.response.ApiResponse;
+import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.AuthService;
 
+@Tag(name = "Users", description = "Profile management and PIN change for all authenticated users. Requires JWT token.")
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -29,18 +35,21 @@ public class UserController {
     // Profile
     // -------------------------------------------------------------------------
 
+    @Operation(summary = "Get my profile", description = "Returns the full profile of the currently authenticated user.")
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(Authentication authentication) {
+    public ResponseEntity<MyApiResponse<UserResponse>> getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         UserResponse response = convertToResponse(user);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ResponseEntity.ok(MyApiResponse.success(response));
     }
     
+    @Operation(summary = "Update my profile", description = "Updates editable profile fields (name, address, bio, etc). Only provided fields are changed.")
+
     @PutMapping("/me")
-    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
+    public ResponseEntity<MyApiResponse<UserResponse>> updateProfile(
             @Valid @RequestBody UserUpdateRequest request,
             Authentication authentication) {
         String email = authentication.getName();
@@ -64,7 +73,7 @@ public class UserController {
         user = userRepository.save(user);
         
         UserResponse response = convertToResponse(user);
-        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", response));
+        return ResponseEntity.ok(MyApiResponse.success("Profile updated successfully", response));
     }
 
     // -------------------------------------------------------------------------
@@ -82,22 +91,24 @@ public class UserController {
      * - newPin must differ from currentPin.
      * - All existing refresh tokens are invalidated — other devices must re-login.
      */
+    @Operation(summary = "Change PIN", description = "Changes the 4-digit PIN. Requires current PIN for verification. Invalidates all refresh tokens — forces re-login on all devices. Works for all 4 user roles.")
     @PatchMapping("/me/change-pin")
-    public ResponseEntity<ApiResponse<Void>> changePin(
+    public ResponseEntity<MyApiResponse<Void>> changePin(
             @Valid @RequestBody ChangePinRequest request,
             Authentication authentication) {
         authService.changePin(authentication.getName(), request);
         return ResponseEntity.ok(
-                ApiResponse.success("PIN changed successfully. Please log in again on all devices.", null));
+                MyApiResponse.success("PIN changed successfully. Please log in again on all devices.", null));
     }
 
+    @Operation(summary = "Get user by ID", description = "Returns the public profile of any user by their database ID.")
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
+    public ResponseEntity<MyApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         UserResponse response = convertToResponse(user);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ResponseEntity.ok(MyApiResponse.success(response));
     }
     
     private UserResponse convertToResponse(User user) {
