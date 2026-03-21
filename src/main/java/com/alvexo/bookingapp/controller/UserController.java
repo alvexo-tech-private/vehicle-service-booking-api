@@ -6,12 +6,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.alvexo.bookingapp.dto.request.ChangePinRequest;
 import com.alvexo.bookingapp.dto.request.UserUpdateRequest;
 import com.alvexo.bookingapp.dto.response.ApiResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
+import com.alvexo.bookingapp.service.AuthService;
 
 @RestController
 @RequestMapping("/api/users")
@@ -19,7 +21,14 @@ public class UserController {
     
     @Autowired
     private UserRepository userRepository;
-    
+
+    @Autowired
+    private AuthService authService;
+
+    // -------------------------------------------------------------------------
+    // Profile
+    // -------------------------------------------------------------------------
+
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
@@ -57,7 +66,31 @@ public class UserController {
         UserResponse response = convertToResponse(user);
         return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", response));
     }
-    
+
+    // -------------------------------------------------------------------------
+    // PIN management — works for all 4 user types
+    // -------------------------------------------------------------------------
+
+    /**
+     * PATCH /api/users/me/change-pin
+     *
+     * Changes the 4-digit PIN for the currently authenticated user.
+     * Works for ALL roles: VEHICLE_USER, MECHANIC, SALES_REPRESENTATIVE, ADMINISTRATOR.
+     *
+     * - currentPin must match the stored PIN.
+     * - newPin and confirmPin must match.
+     * - newPin must differ from currentPin.
+     * - All existing refresh tokens are invalidated — other devices must re-login.
+     */
+    @PatchMapping("/me/change-pin")
+    public ResponseEntity<ApiResponse<Void>> changePin(
+            @Valid @RequestBody ChangePinRequest request,
+            Authentication authentication) {
+        authService.changePin(authentication.getName(), request);
+        return ResponseEntity.ok(
+                ApiResponse.success("PIN changed successfully. Please log in again on all devices.", null));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
         User user = userRepository.findById(id)
