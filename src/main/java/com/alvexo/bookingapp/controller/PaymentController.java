@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.alvexo.bookingapp.dto.response.ApiResponse;
+import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.PaymentResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.PaymentType;
@@ -21,6 +21,10 @@ import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.PaymentService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@Tag(name = "Payments", description = "Create and manage payments for bookings and subscriptions. Requires JWT token.")
 @RestController
 @RequestMapping("/api/payments")
 public class PaymentController {
@@ -38,7 +42,7 @@ public class PaymentController {
 	}
 
 	@PostMapping("/create")
-    public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(
+    public ResponseEntity<MyApiResponse<PaymentResponse>> createPayment(
             @RequestParam PaymentType paymentType,
             @RequestParam Long relatedEntityId,
             @RequestParam BigDecimal amount,
@@ -48,25 +52,28 @@ public class PaymentController {
         
         PaymentResponse response = paymentService.createPayment(user, paymentType, relatedEntityId, amount);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Payment initiated", response));
+                .body(MyApiResponse.success("Payment initiated", response));
     }
     
+    @Operation(summary = "Confirm a payment", description = "Confirms a payment after client-side processing (e.g. Stripe confirmation).")
+
     @PostMapping("/confirm")
-    public ResponseEntity<ApiResponse<PaymentResponse>> confirmPayment(
+    public ResponseEntity<MyApiResponse<PaymentResponse>> confirmPayment(
             @RequestParam String transactionId,
             @RequestParam String stripePaymentIntentId) {
         PaymentResponse response = paymentService.confirmPayment(transactionId, stripePaymentIntentId);
-        return ResponseEntity.ok(ApiResponse.success("Payment confirmed", response));
+        return ResponseEntity.ok(MyApiResponse.success("Payment confirmed", response));
     }
     
+    @Operation(summary = "Get payment history", description = "Returns paginated payment history for the authenticated user.")
     @GetMapping("/history")
-    public ResponseEntity<ApiResponse<Page<PaymentResponse>>> getPaymentHistory(
+    public ResponseEntity<MyApiResponse<Page<PaymentResponse>>> getPaymentHistory(
             Pageable pageable,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         Page<PaymentResponse> payments = paymentService.getUserPayments(user, pageable);
-        return ResponseEntity.ok(ApiResponse.success(payments));
+        return ResponseEntity.ok(MyApiResponse.success(payments));
     }
 }

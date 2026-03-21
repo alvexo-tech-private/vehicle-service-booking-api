@@ -1,5 +1,10 @@
 package com.alvexo.bookingapp.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,7 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.alvexo.bookingapp.dto.request.AvailabilityRequest;
-import com.alvexo.bookingapp.dto.response.ApiResponse;
+import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.AvailabilityResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -20,6 +25,7 @@ import com.alvexo.bookingapp.service.MechanicService;
 import java.math.BigDecimal;
 import java.util.List;
 
+@Tag(name = "Mechanics", description = "Mechanic availability management and nearby mechanic search. Requires JWT token.")
 @RestController
 @RequestMapping("/api/mechanics")
 public class MechanicController {
@@ -32,7 +38,7 @@ public class MechanicController {
     
     @PostMapping("/availability")
     @PreAuthorize("hasRole('MECHANIC')")
-    public ResponseEntity<ApiResponse<AvailabilityResponse>> addAvailability(
+    public ResponseEntity<MyApiResponse<AvailabilityResponse>> addAvailability(
             @Valid @RequestBody AvailabilityRequest request,
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
@@ -40,23 +46,23 @@ public class MechanicController {
         
         AvailabilityResponse response = mechanicService.addAvailability(mechanic, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Availability added successfully", response));
+                .body(MyApiResponse.success("Availability added successfully", response));
     }
     
     @GetMapping("/availability")
     @PreAuthorize("hasRole('MECHANIC')")
-    public ResponseEntity<ApiResponse<List<AvailabilityResponse>>> getMyAvailability(
+    public ResponseEntity<MyApiResponse<List<AvailabilityResponse>>> getMyAvailability(
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         List<AvailabilityResponse> availability = mechanicService.getMechanicAvailability(mechanic);
-        return ResponseEntity.ok(ApiResponse.success(availability));
+        return ResponseEntity.ok(MyApiResponse.success(availability));
     }
     
     @PutMapping("/availability/{id}")
     @PreAuthorize("hasRole('MECHANIC')")
-    public ResponseEntity<ApiResponse<AvailabilityResponse>> updateAvailability(
+    public ResponseEntity<MyApiResponse<AvailabilityResponse>> updateAvailability(
             @PathVariable Long id,
             @Valid @RequestBody AvailabilityRequest request,
             Authentication authentication) {
@@ -64,27 +70,29 @@ public class MechanicController {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         AvailabilityResponse response = mechanicService.updateAvailability(id, request, mechanic);
-        return ResponseEntity.ok(ApiResponse.success("Availability updated successfully", response));
+        return ResponseEntity.ok(MyApiResponse.success("Availability updated successfully", response));
     }
     
     @DeleteMapping("/availability/{id}")
     @PreAuthorize("hasRole('MECHANIC')")
-    public ResponseEntity<ApiResponse<Void>> deleteAvailability(
+    public ResponseEntity<MyApiResponse<Void>> deleteAvailability(
             @PathVariable Long id,
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         mechanicService.deleteAvailability(id, mechanic);
-        return ResponseEntity.ok(ApiResponse.success("Availability deleted successfully", null));
+        return ResponseEntity.ok(MyApiResponse.success("Availability deleted successfully", null));
     }
     
+    @Operation(summary = "Find nearby mechanics", description = "Returns active mechanics within a given radius (km) of provided coordinates.")
+
     @GetMapping("/nearby")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> findNearbyMechanics(
+    public ResponseEntity<MyApiResponse<List<UserResponse>>> findNearbyMechanics(
             @RequestParam BigDecimal latitude,
             @RequestParam BigDecimal longitude,
             @RequestParam(defaultValue = "10.0") double radiusKm) {
         List<UserResponse> mechanics = mechanicService.findNearbyMechanics(latitude, longitude, radiusKm);
-        return ResponseEntity.ok(ApiResponse.success(mechanics));
+        return ResponseEntity.ok(MyApiResponse.success(mechanics));
     }
 }
