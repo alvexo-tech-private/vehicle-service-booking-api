@@ -5,6 +5,7 @@ import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
+import com.alvexo.bookingapp.service.MyUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,12 +20,15 @@ public class MyUserController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private MyUserService myUserService;
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        UserResponse response = UserResponse.convertToResponse(user);
+        UserResponse response = myUserService.convertToResponse(user);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
