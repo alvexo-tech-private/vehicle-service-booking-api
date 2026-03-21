@@ -21,4 +21,5 @@ public class TokenResponse {
     private String firstName;
     private String lastName;
     private UserRole role;
+    private String referralCode;
 }

@@ -11,14 +11,14 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ApiResponse<T> {
+public class MyApiResponse<T> {
     private boolean success;
     private String message;
     private T data;
     private LocalDateTime timestamp;
 
-    public static <T> ApiResponse<T> success(T data) {
-        return ApiResponse.<T>builder()
+    public static <T> MyApiResponse<T> success(T data) {
+        return MyApiResponse.<T>builder()
                 .success(true)
                 .message("Operation successful")
                 .timestamp(LocalDateTime.now())
@@ -26,16 +26,16 @@ public class ApiResponse<T> {
                 .build();
     }
     
-    public static <T> ApiResponse<T> success(String message, T data) {
-        return ApiResponse.<T>builder()
+    public static <T> MyApiResponse<T> success(String message, T data) {
+        return MyApiResponse.<T>builder()
                 .success(true)
                 .message(message)
                 .data(data).timestamp(LocalDateTime.now())
                 .build();
     }
     
-    public static <T> ApiResponse<T> error(String message) {
-        return ApiResponse.<T>builder()
+    public static <T> MyApiResponse<T> error(String message) {
+        return MyApiResponse.<T>builder()
                 .success(false)
                 .message(message)
                 .timestamp(LocalDateTime.now())

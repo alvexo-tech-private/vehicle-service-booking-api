@@ -15,17 +15,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alvexo.bookingapp.dto.request.VehicleRequest;
-import com.alvexo.bookingapp.dto.response.ApiResponse;
+import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.VehicleResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.VehicleService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+@Tag(name = "Vehicles", description = "Vehicle catalogue management. Creating and updating vehicles requires ADMINISTRATOR role.")
 @RestController
 @RequestMapping("/api/vehicles")
 @RequiredArgsConstructor
@@ -41,8 +44,9 @@ public class VehicleController {
     
     
     
+    @Operation(summary = "Create a vehicle", description = "Adds a new vehicle make/model to the catalogue.")
     @PostMapping
-    public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
+    public ResponseEntity<MyApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody VehicleRequest request,Authentication authentication) {
         log.info("Creating vehicle: {} {} {}", request.getManufacturer(), 
                  request.getModelName(), request.getYear());
@@ -51,19 +55,21 @@ public class VehicleController {
         
         VehicleResponse response = vehicleService.createVehicle(request,user);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Vehicle created successfully",response));
+                .body(MyApiResponse.success("Vehicle created successfully",response));
     }
     
+    @Operation(summary = "Get all vehicles", description = "Returns paginated list of all vehicles in the catalogue.")
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<VehicleResponse>>> getAllVehicles(Pageable pageable) {
+    public ResponseEntity<MyApiResponse<Page<VehicleResponse>>> getAllVehicles(Pageable pageable) {
         Page<VehicleResponse> vehicles = vehicleService.getAllActiveVehicles(pageable);
-        return ResponseEntity.ok(ApiResponse.success(vehicles));
+        return ResponseEntity.ok(MyApiResponse.success(vehicles));
     }
     
+    @Operation(summary = "Get vehicle by ID", description = "Returns details of a single vehicle by ID.")
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<VehicleResponse>> getVehicleById(@PathVariable Long id) {
+    public ResponseEntity<MyApiResponse<VehicleResponse>> getVehicleById(@PathVariable Long id) {
         VehicleResponse vehicle = vehicleService.getVehicleById(id);
-        return ResponseEntity.ok(ApiResponse.success(vehicle));
+        return ResponseEntity.ok(MyApiResponse.success(vehicle));
     }
 
 	
