@@ -52,21 +52,6 @@ public class AuthController {
 		return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
 	}
 
-	@PostMapping("/mobile/register")
-	public ResponseEntity<ApiResponse<TokenResponse>> mobileRegister(
-			@Valid @RequestBody MobileRegisterRequest request) {
-
-		TokenResponse response = authService.registerWithMobile(request);
-		return ResponseEntity.ok(ApiResponse.success("Mobile registration successful", response));
-	}
-
-	@PostMapping("/mobile/login")
-	public ResponseEntity<ApiResponse<TokenResponse>> mobileLogin(@Valid @RequestBody MobileLoginRequest request) {
-
-		TokenResponse response = authService.loginWithMobile(request);
-		return ResponseEntity.ok(ApiResponse.success("Mobile login successful", response));
-	}
-
 	@PostMapping("/mobile/send-otp")
 	public ResponseEntity<ApiResponse<String>> sendOtp(@RequestBody SendOtpRequest request) {
 

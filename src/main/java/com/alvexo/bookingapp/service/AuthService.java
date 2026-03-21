@@ -15,6 +15,9 @@ import com.alvexo.bookingapp.dto.request.MobileLoginRequest;
 import com.alvexo.bookingapp.dto.request.MobileRegisterRequest;
 import com.alvexo.bookingapp.dto.request.RefreshTokenRequest;
 import com.alvexo.bookingapp.dto.request.RegisterRequest;
+import com.alvexo.bookingapp.dto.request.SalesRepresentativeRegisterRequest;
+import com.alvexo.bookingapp.dto.request.AdministratorRegisterRequest;
+import com.alvexo.bookingapp.dto.request.ChangePinRequest;
 import com.alvexo.bookingapp.dto.request.VehicleUserRegisterRequest;
 import com.alvexo.bookingapp.dto.request.WorkshopMechanicRegisterRequest;
 import com.alvexo.bookingapp.dto.request.VerifyOtpRequest;
@@ -263,6 +266,7 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .role(user.getRole())
+                .referralCode(user.getReferralCode())
                 .build();
     }
     
@@ -300,6 +304,7 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .role(user.getRole())
+                .referralCode(user.getReferralCode()) // non-null only for SALES_REPRESENTATIVE
                 .build();
     }
     
@@ -371,6 +376,116 @@ public class AuthService {
 
         user = userRepository.save(user);
         return createTokenResponse(user);
+    }
+
+
+    /**
+     * Admin-only: registers a new Sales Representative.
+     * A unique referral code is auto-generated and returned in the response.
+     */
+    @Transactional
+    public TokenResponse registerSalesRepresentative(SalesRepresentativeRegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email already registered");
+        }
+
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        if (userRepository.existsByMobileNumber(mobile)) {
+            throw new BadRequestException("Mobile number already registered");
+        }
+
+        User user = User.builder()
+                .firstName(request.getName())
+                .lastName("")
+                .mobileNumber(mobile)
+                .email(request.getEmail())
+                .city(request.getCity())
+                .area(request.getArea())
+                .password(passwordEncoder.encode(request.getPin()))
+                .role(UserRole.SALES_REPRESENTATIVE)
+                .active(true)
+                .build();
+
+        // Auto-generate a unique referral code for every sales representative
+        user.setReferralCode(generateUniqueReferralCode());
+
+        user = userRepository.save(user);
+        return createTokenResponse(user);
+    }
+
+    /**
+     * Admin-only: registers a new Administrator.
+     * Only an existing authenticated ADMINISTRATOR can reach this endpoint.
+     */
+    @Transactional
+    public TokenResponse registerAdministrator(AdministratorRegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email already registered");
+        }
+
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        if (userRepository.existsByMobileNumber(mobile)) {
+            throw new BadRequestException("Mobile number already registered");
+        }
+
+        User user = User.builder()
+                .firstName(request.getName())
+                .lastName("")
+                .mobileNumber(mobile)
+                .email(request.getEmail())
+                .city(request.getCity())
+                .area(request.getArea())
+                .password(passwordEncoder.encode(request.getPin()))
+                .role(UserRole.ADMINISTRATOR)
+                .active(true)
+                .build();
+
+        user = userRepository.save(user);
+        return createTokenResponse(user);
+    }
+
+
+    /**
+     * Changes the 4-digit PIN for any authenticated user (all 4 roles).
+     *
+     * Rules:
+     *  1. currentPin must match the stored (encoded) password.
+     *  2. newPin and confirmPin must match each other.
+     *  3. newPin must be different from currentPin.
+     *  4. All existing refresh tokens are invalidated so other devices
+     *     are forced to re-authenticate with the new PIN.
+     *
+     * @param email  the email of the currently authenticated user (from JWT principal)
+     * @param request the change-pin request body
+     */
+    @Transactional
+    public void changePin(String email, ChangePinRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        // 1. Verify current PIN
+        if (!passwordEncoder.matches(request.getCurrentPin(), user.getPassword())) {
+            throw new BadRequestException("Current PIN is incorrect");
+        }
+
+        // 2. New PIN and confirm PIN must match
+        if (!request.getNewPin().equals(request.getConfirmPin())) {
+            throw new BadRequestException("New PIN and confirm PIN do not match");
+        }
+
+        // 3. New PIN must differ from current PIN
+        if (passwordEncoder.matches(request.getNewPin(), user.getPassword())) {
+            throw new BadRequestException("New PIN must be different from the current PIN");
+        }
+
+        // 4. Save the new encoded PIN
+        user.setPassword(passwordEncoder.encode(request.getNewPin()));
+        userRepository.save(user);
+
+        // 5. Invalidate all refresh tokens so other sessions must re-login
+        refreshTokenRepository.deleteByUser(user);
     }
 
     private String generateUniqueReferralCode() {
