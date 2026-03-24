@@ -18,7 +18,10 @@ public class UserVehicleResponseDto {
     // Vehicle summary
     private Long vehicleId;
     private String vehicleName;
+    private String vehicleNumber;
     private String vehicleType;
     private String licensePlate;
+    private String image;
+    private String insuranceNumber;
 
 }

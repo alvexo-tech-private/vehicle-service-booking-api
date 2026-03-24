@@ -1,5 +1,6 @@
 package com.alvexo.bookingapp.service;
 
+import com.alvexo.bookingapp.dto.request.UserVehicleRequest;
 import com.alvexo.bookingapp.dto.response.UserVehicleResponseDto;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -25,8 +26,8 @@ public class UserVehicleService {
     private VehicleRepository vehicleRepository;
 
     @Transactional
-    public UserVehicleResponseDto mapVehicleToUser(User user, Long vehicleId, Boolean isPrimary) {
-        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+    public UserVehicleResponseDto mapVehicleToUser(User user, UserVehicleRequest userVehicleRequest) {
+        Vehicle vehicle = vehicleRepository.findById(userVehicleRequest.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
 
         if (userVehicleRepository.existsByUserAndVehicle(user, vehicle)) {
@@ -34,6 +35,7 @@ public class UserVehicleService {
         }
 
         // If this is primary, unset other primary vehicles
+        Boolean isPrimary = userVehicleRequest.getIsPrimary();
         if (isPrimary != null && isPrimary) {
             userVehicleRepository.findByUserAndIsPrimaryTrue(user)
                     .ifPresent(uv -> {
@@ -45,6 +47,9 @@ public class UserVehicleService {
         UserVehicle userVehicle = UserVehicle.builder()
                 .user(user)
                 .vehicle(vehicle)
+                .vehicleNumber(userVehicleRequest.getVehicleNumber())
+                .image(userVehicleRequest.getImage())
+                .insuranceNumber(userVehicleRequest.getInsuranceNumber())
                 .isPrimary(isPrimary != null ? isPrimary : false)
                 .build();
 
@@ -81,8 +86,11 @@ public class UserVehicleService {
                 // Vehicle fields — adjust getters to match your Vehicle model
                 .vehicleId(uv.getVehicle().getId())
                 .vehicleName(uv.getVehicle().getMake())
+                .vehicleNumber(uv.getVehicleNumber())
                 .vehicleType(uv.getVehicle().getVehicleType().name())
                 .licensePlate(uv.getVehicle().getLicensePlate())
+                .image(uv.getImage())
+                .insuranceNumber(uv.getInsuranceNumber())
                 .build();
     }
 
