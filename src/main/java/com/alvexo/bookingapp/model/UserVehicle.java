@@ -1,10 +1,12 @@
 package com.alvexo.bookingapp.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,6 +33,15 @@ public class UserVehicle {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
+
+    @Column(name = "vehicle_number", nullable = false)
+    private String vehicleNumber;
+
+    @Column(name = "vehicle_image")
+    private String vehicleImage;
+
+    @Column(name = "insurance_number")
+    private String insuranceNumber;
     
     @Column(name = "is_primary")
     @Builder.Default

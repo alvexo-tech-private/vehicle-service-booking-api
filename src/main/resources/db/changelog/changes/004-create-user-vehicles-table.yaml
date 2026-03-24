@@ -74,3 +74,37 @@ databaseChangeLog:
             columns:
               - column:
                   name: vehicle_id
+
+
+  - changeSet:
+      id: 004b-add-columns-user-vehicles-table
+      author: system
+      changes:
+        - addColumn:
+            tableName: user_vehicles
+            columns:
+              - column:
+                  name: vehicle_number
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: image
+                  type: VARCHAR(255)
+              - column:
+                  name: insurance_number
+                  type: VARCHAR(50)
+
+  - changeSet:
+      id: 004c-rename-image-column-user-vehicles
+      author: system
+      changes:
+        - renameColumn:
+            tableName: user_vehicles
+            oldColumnName: image
+            newColumnName: vehicle_image
+            columnDataType: VARCHAR(255)
+        - modifyDataType:
+            tableName: user_vehicles
+            columnName: vehicle_image
+            newDataType: TEXT

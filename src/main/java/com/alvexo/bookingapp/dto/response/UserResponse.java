@@ -1,5 +1,6 @@
 package com.alvexo.bookingapp.dto.response;
 
+import com.alvexo.bookingapp.model.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -7,8 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
-import com.alvexo.bookingapp.model.UserRole;
+import java.util.List;
 
 @Data
 @Builder
@@ -44,4 +44,6 @@ public class UserResponse {
     private Integer totalReferrals;
     private BigDecimal totalBonusEarned;
     private LocalDateTime createdAt;
+    public List<UserVehicleResponseDto> userVehicleResponseDtos;
+
 }
