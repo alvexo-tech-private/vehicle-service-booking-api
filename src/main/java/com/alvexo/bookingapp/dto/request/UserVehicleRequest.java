@@ -10,7 +10,7 @@ public class UserVehicleRequest {
     private Long vehicleId;
     @NotBlank(message = "Vehicle Number must not be empty")
     private String vehicleNumber;
-    private String image;
+    private String vehicleImage;
     private String insuranceNumber;
     private Boolean isPrimary;
 }

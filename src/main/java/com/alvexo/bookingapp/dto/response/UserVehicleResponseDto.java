@@ -21,7 +21,7 @@ public class UserVehicleResponseDto {
     private String vehicleNumber;
     private String vehicleType;
     private String licensePlate;
-    private String image;
+    private String vehicleImage;
     private String insuranceNumber;
 
 }

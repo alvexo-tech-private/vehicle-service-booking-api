@@ -37,8 +37,8 @@ public class UserVehicle {
     @Column(name = "vehicle_number", nullable = false)
     private String vehicleNumber;
 
-    @Column(name = "image")
-    private String image;
+    @Column(name = "vehicle_image")
+    private String vehicleImage;
 
     @Column(name = "insurance_number")
     private String insuranceNumber;

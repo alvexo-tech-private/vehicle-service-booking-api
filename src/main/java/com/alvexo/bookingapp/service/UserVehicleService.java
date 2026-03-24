@@ -48,7 +48,7 @@ public class UserVehicleService {
                 .user(user)
                 .vehicle(vehicle)
                 .vehicleNumber(userVehicleRequest.getVehicleNumber())
-                .image(userVehicleRequest.getImage())
+                .vehicleImage(userVehicleRequest.getVehicleImage())
                 .insuranceNumber(userVehicleRequest.getInsuranceNumber())
                 .isPrimary(isPrimary != null ? isPrimary : false)
                 .build();
@@ -89,7 +89,7 @@ public class UserVehicleService {
                 .vehicleNumber(uv.getVehicleNumber())
                 .vehicleType(uv.getVehicle().getVehicleType().name())
                 .licensePlate(uv.getVehicle().getLicensePlate())
-                .image(uv.getImage())
+                .vehicleImage(uv.getVehicleImage())
                 .insuranceNumber(uv.getInsuranceNumber())
                 .build();
     }

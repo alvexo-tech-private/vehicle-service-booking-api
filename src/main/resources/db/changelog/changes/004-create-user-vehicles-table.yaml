@@ -94,3 +94,17 @@ databaseChangeLog:
               - column:
                   name: insurance_number
                   type: VARCHAR(50)
+
+  - changeSet:
+      id: 004c-rename-image-column-user-vehicles
+      author: system
+      changes:
+        - renameColumn:
+            tableName: user_vehicles
+            oldColumnName: image
+            newColumnName: vehicle_image
+            columnDataType: VARCHAR(255)
+        - modifyDataType:
+            tableName: user_vehicles
+            columnName: vehicle_image
+            newDataType: TEXT
