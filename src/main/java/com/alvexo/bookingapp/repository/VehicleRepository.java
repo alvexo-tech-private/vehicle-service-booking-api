@@ -13,8 +13,7 @@ import java.util.Optional;
 
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
-    Optional<Vehicle> findByVin(String vin);
     List<Vehicle> findByCreatedBy(User createdBy);
     Page<Vehicle> findByActiveTrue(Pageable pageable);
-    boolean existsByVin(String vin);
+    Optional<Vehicle> findById(Long id);
 }

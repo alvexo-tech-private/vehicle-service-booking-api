@@ -1,9 +1,6 @@
 package com.alvexo.bookingapp.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import com.alvexo.bookingapp.dto.request.UserVehicleRequestDTO;
 import com.alvexo.bookingapp.dto.response.UserVehicleResponseDto;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -25,6 +22,7 @@ public class UserVehicleService {
     @Autowired
     private VehicleRepository vehicleRepository;
 
+   
     @Transactional
     public UserVehicleResponseDto mapVehicleToUser(User user, Long vehicleId, Boolean isPrimary) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
@@ -70,4 +68,22 @@ public class UserVehicleService {
 
         userVehicleRepository.delete(userVehicle);
     }
+
+    public UserVehicleResponseDto from(UserVehicle uv) {
+        return UserVehicleResponseDto.builder()
+                .id(uv.getId())
+                .isPrimary(uv.getIsPrimary())
+                // User fields
+                .userId(uv.getUser().getId())
+                .userEmail(uv.getUser().getEmail())
+                .userName(uv.getUser().getFirstName() + uv.getUser().getLastName())
+                // Vehicle fields — adjust getters to match your Vehicle model
+                .vehicleId(uv.getVehicle().getId())
+                .vehicleName(uv.getVehicle().getMake())
+                .vehicleType(uv.getVehicle().getVehicleType().name())
+                .registraionYear(uv.getRegistraionYear())
+                .registrationNumber(uv.getRegistrationNumber())
+                .build();
+    }
+
 }

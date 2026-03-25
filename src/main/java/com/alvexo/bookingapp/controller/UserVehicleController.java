@@ -10,10 +10,11 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.alvexo.bookingapp.dto.request.UserVehicleRequestDTO;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.UserVehicleResponseDto;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -23,6 +24,7 @@ import com.alvexo.bookingapp.service.UserVehicleService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 
 @Tag(name = "User Vehicles", description = "Map and manage vehicles owned by the authenticated vehicle user. Requires JWT token.")
 @RestController
@@ -35,19 +37,18 @@ public class UserVehicleController {
     @Autowired
     private UserRepository userRepository;
 
-    @Operation(summary = "Map a vehicle to user", description = "Associates an existing vehicle with the authenticated user account.")
 
+    @Operation(summary = "Map a vehicle to user", description = "Associates an existing vehicle with the authenticated user account.")
     @PostMapping("/map")
     public ResponseEntity<MyApiResponse<UserVehicleResponseDto>> mapVehicle(
-            @RequestParam Long vehicleId,
-            @RequestParam(required = false) Boolean isPrimary,
-            Authentication authentication) {
-        User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        UserVehicleResponseDto response = userVehicleService.mapVehicleToUser(user, vehicleId, isPrimary);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(MyApiResponse.success("Vehicle mapped successfully", response));
+    		@Valid @RequestBody UserVehicleRequestDTO request,
+    		Authentication authentication) {
+    	User user = userRepository.findByEmail(authentication.getName())
+    			.orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    	
+    	UserVehicleResponseDto response = userVehicleService.mapVehicleToUser(user, request);
+    	return ResponseEntity.status(HttpStatus.CREATED)
+    			.body(MyApiResponse.success("Vehicle mapped successfully", response));
     }
 
     @Operation(summary = "Get my vehicles", description = "Returns all vehicles mapped to the authenticated user.")

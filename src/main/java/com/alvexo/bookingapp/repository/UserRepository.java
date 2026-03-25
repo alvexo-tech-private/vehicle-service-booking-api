@@ -23,6 +23,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByMobileNumber(String mobileNumber);
     List<User> findByRole(UserRole role);
     Page<User> findByRole(UserRole role, Pageable pageable);
+    Optional<User> findByEmailOrMobileNumber(String mobileNumber,String email);
     
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.active = true " +
            "AND (:latitude IS NULL OR :longitude IS NULL OR " +

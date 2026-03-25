@@ -31,29 +31,18 @@ public class Vehicle {
     @Column(nullable = false)
     private Integer year;
     
-    @Column(unique = true, length = 50)
-    private String vin;
-    
-    @Column(name = "license_plate", length = 50)
-    private String licensePlate;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "vehicle_type", nullable = false, length = 50)
     private VehicleType vehicleType;
     
-    @Column(length = 50)
-    private String color;
-    
-    private Integer mileage;
     
     @Column(name = "engine_type", length = 50)
     private String engineType;
-    
-    @Column(name = "transmission_type", length = 50)
-    private String transmissionType;
-    
+
     @Column(name = "fuel_type", length = 50)
     private String fuelType;
+    
     
     @Column(name = "image_url", length = 500)
     private String imageUrl;

@@ -1,11 +1,5 @@
 package com.alvexo.bookingapp.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
-
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +24,10 @@ import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.AuthService;
 import com.alvexo.bookingapp.service.VehicleService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 
 @Tag(name = "Admin — User Management", description = "Administrator-only endpoints for creating SALES_REPRESENTATIVE and ADMINISTRATOR accounts, and managing vehicles. Requires JWT with ADMINISTRATOR role.")
 @RestController

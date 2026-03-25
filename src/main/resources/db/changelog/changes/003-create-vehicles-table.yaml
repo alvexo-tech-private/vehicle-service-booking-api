@@ -29,29 +29,12 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: vin
-                  type: VARCHAR(50)
-                  constraints:
-                    unique: true
-              - column:
-                  name: license_plate
-                  type: VARCHAR(50)
-              - column:
                   name: vehicle_type
                   type: VARCHAR(50)
                   constraints:
                     nullable: false
               - column:
-                  name: color
-                  type: VARCHAR(50)
-              - column:
-                  name: mileage
-                  type: INT
-              - column:
                   name: engine_type
-                  type: VARCHAR(50)
-              - column:
-                  name: transmission_type
                   type: VARCHAR(50)
               - column:
                   name: fuel_type
@@ -88,12 +71,7 @@ databaseChangeLog:
             constraintName: fk_vehicles_created_by
             referencedTableName: users
             referencedColumnNames: id
-        - createIndex:
-            indexName: idx_vehicles_vin
-            tableName: vehicles
-            columns:
-              - column:
-                  name: vin
+        
         - createIndex:
             indexName: idx_vehicles_created_by
             tableName: vehicles

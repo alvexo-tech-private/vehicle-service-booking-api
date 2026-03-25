@@ -13,7 +13,6 @@ import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.model.Vehicle;
-import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.repository.VehicleRepository;
 
 @Service
@@ -22,31 +21,18 @@ public class VehicleService {
     @Autowired
     private VehicleRepository vehicleRepository;
     
-    @Autowired
-    private UserRepository userRepository;
-    
     @Transactional
     public VehicleResponse createVehicle(VehicleRequest request, User admin) {
         if (admin.getRole() != UserRole.ADMINISTRATOR) {
             throw new BadRequestException("Only administrators can create vehicles");
         }
         
-        if (request.getVin() != null && vehicleRepository.existsByVin(request.getVin())) {
-            throw new BadRequestException("Vehicle with this VIN already exists");
-        }
         
         Vehicle vehicle = Vehicle.builder()
                 .make(request.getManufacturer())
                 .model(request.getModelName())
                 .year(request.getYear())
-                .vin(request.getVin())
-                .licensePlate(request.getLicensePlate())
                 .vehicleType(request.getVehicleType())
-                .color(request.getColor())
-                .mileage(request.getMileage())
-                .engineType(request.getEngineType())
-                .transmissionType(request.getTransmissionType())
-                .fuelType(request.getFuelType())
                 .imageUrl(request.getImageUrl())
                 .createdBy(admin)
                 .build();
@@ -67,14 +53,7 @@ public class VehicleService {
         vehicle.setMake(request.getManufacturer());
         vehicle.setModel(request.getModelName());
         vehicle.setYear(request.getYear());
-        vehicle.setVin(request.getVin());
-        vehicle.setLicensePlate(request.getLicensePlate());
         vehicle.setVehicleType(request.getVehicleType());
-        vehicle.setColor(request.getColor());
-        vehicle.setMileage(request.getMileage());
-        vehicle.setEngineType(request.getEngineType());
-        vehicle.setTransmissionType(request.getTransmissionType());
-        vehicle.setFuelType(request.getFuelType());
         vehicle.setImageUrl(request.getImageUrl());
         
         vehicle = vehicleRepository.save(vehicle);
@@ -111,14 +90,8 @@ public class VehicleService {
                 .make(vehicle.getMake())
                 .model(vehicle.getModel())
                 .year(vehicle.getYear())
-                .vin(vehicle.getVin())
-                .licensePlate(vehicle.getLicensePlate())
                 .vehicleType(vehicle.getVehicleType())
-                .color(vehicle.getColor())
-                .mileage(vehicle.getMileage())
                 .engineType(vehicle.getEngineType())
-                .transmissionType(vehicle.getTransmissionType())
-                .fuelType(vehicle.getFuelType())
                 .imageUrl(vehicle.getImageUrl())
                 .active(vehicle.getActive())
                 .createdAt(vehicle.getCreatedAt())
