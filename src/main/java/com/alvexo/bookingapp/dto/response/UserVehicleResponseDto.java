@@ -20,7 +20,12 @@ public class UserVehicleResponseDto {
     private Long vehicleId;
     private String vehicleName;
     private String vehicleType;
-    private String licensePlate;
+    private String registrationNumber;
+    private Integer registraionYear;
+
+    private String color;
+    private Integer mileage;
+    private String engineType;
 
     public static UserVehicleResponseDto from(UserVehicle uv) {
         return UserVehicleResponseDto.builder()

@@ -42,6 +42,12 @@ public class UserVehicle {
     @Column(name = "purchase_date")
     private LocalDate purchaseDate;
     
+    @Column(name="registration_number")
+    private String registrationNumber;
+
+    @Column(name="registration_year")
+    private Integer registraionYear;
+    
     @Column(columnDefinition = "TEXT")
     private String notes;
     

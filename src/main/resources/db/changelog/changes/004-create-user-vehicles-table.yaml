@@ -36,6 +36,16 @@ databaseChangeLog:
                   name: purchase_date
                   type: DATE
               - column:
+                  name: registration_year
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: registration_number
+                  type: VARCHAR(25)
+                  constraints:
+                    nullable: false
+              - column:
                   name: notes
                   type: TEXT
               - column:
