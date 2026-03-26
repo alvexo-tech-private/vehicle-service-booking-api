@@ -1,5 +1,12 @@
 package com.alvexo.bookingapp.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.alvexo.bookingapp.dto.request.UserVehicleRequestDTO;
 import com.alvexo.bookingapp.dto.response.UserVehicleResponseDto;
 import com.alvexo.bookingapp.exception.BadRequestException;
@@ -9,9 +16,6 @@ import com.alvexo.bookingapp.model.UserVehicle;
 import com.alvexo.bookingapp.model.Vehicle;
 import com.alvexo.bookingapp.repository.UserVehicleRepository;
 import com.alvexo.bookingapp.repository.VehicleRepository;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class UserVehicleService {
@@ -24,36 +28,38 @@ public class UserVehicleService {
 
    
     @Transactional
-    public UserVehicleResponseDto mapVehicleToUser(User user, Long vehicleId, Boolean isPrimary) {
-        Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
-
-        if (userVehicleRepository.existsByUserAndVehicle(user, vehicle)) {
-            throw new BadRequestException("Vehicle already mapped to this user");
-        }
-
-        // If this is primary, unset other primary vehicles
-        if (isPrimary != null && isPrimary) {
-            userVehicleRepository.findByUserAndIsPrimaryTrue(user)
-                    .ifPresent(uv -> {
-                        uv.setIsPrimary(false);
-                        userVehicleRepository.save(uv);
-                    });
-        }
-
-        UserVehicle userVehicle = UserVehicle.builder()
-                .user(user)
-                .vehicle(vehicle)
-                .isPrimary(isPrimary != null ? isPrimary : false)
-                .build();
-
-        return UserVehicleResponseDto.from(userVehicleRepository.save(userVehicle));
+    public UserVehicleResponseDto mapVehicleToUser(User user, UserVehicleRequestDTO requestDto) {
+    	Vehicle vehicle = vehicleRepository.findById(requestDto.getVehicleId())
+    			.orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
+    	
+    	if (userVehicleRepository.existsByUserAndVehicle(user, vehicle)) {
+    		throw new BadRequestException("Vehicle already mapped to this user");
+    	}
+    	Boolean isPrimary = requestDto.getIsPrimary();
+    	// If this is primary, unset other primary vehicles
+    	if (isPrimary != null && isPrimary) {
+    		userVehicleRepository.findByUserAndIsPrimaryTrue(user)
+    		.ifPresent(uv -> {
+    			uv.setIsPrimary(false);
+    			userVehicleRepository.save(uv);
+    		});
+    	}
+    	
+    	UserVehicle userVehicle = UserVehicle.builder()
+    			.user(user)
+    			.vehicle(vehicle)
+    			.registraionYear(requestDto.getRegistraionYear())
+    			.registrationNumber(requestDto.getRegistrationNumber())
+    			.isPrimary(isPrimary != null ? isPrimary : false)
+    			.build();
+    	
+    	return from(userVehicleRepository.save(userVehicle));
     }
 
     public List<UserVehicleResponseDto> getUserVehicles(User user) {
         return userVehicleRepository.findByUser(user)
                 .stream()
-                .map(UserVehicleResponseDto::from)
+                .map(this::from)
                 .collect(Collectors.toList());
     }
 
