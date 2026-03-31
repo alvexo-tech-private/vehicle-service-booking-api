@@ -40,7 +40,7 @@ public class MechanicAvailability {
     @Builder.Default
     private Integer slotDurationMinutes = 60;
 
-    @Column(name = "max_slots_perday")
+    @Column(name = "max_slots_per_day")
     @Builder.Default
     private Integer maxSlotsPerDay = 10;
     

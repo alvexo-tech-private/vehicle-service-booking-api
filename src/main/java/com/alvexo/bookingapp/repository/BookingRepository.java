@@ -36,5 +36,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countConflictingBookings(@Param("mechanic") User mechanic,
                                    @Param("startTime") LocalDateTime startTime,
                                    @Param("endTime") LocalDateTime endTime);
-	List<Booking> findByMechanicIdAndStartTimeBetween(Long mechanicId, LocalDateTime dayStart, LocalDateTime dayEnd);
+	//List<Booking> findByMechanicIdAndStartTimeBetween(Long mechanicId, LocalDateTime dayStart, LocalDateTime dayEnd);
 }
