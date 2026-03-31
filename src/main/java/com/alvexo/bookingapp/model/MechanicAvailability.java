@@ -39,6 +39,10 @@ public class MechanicAvailability {
     @Column(name = "slot_duration_minutes")
     @Builder.Default
     private Integer slotDurationMinutes = 60;
+
+    @Column(name = "max_slots_perday")
+    @Builder.Default
+    private Integer maxSlotsPerDay = 10;
     
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

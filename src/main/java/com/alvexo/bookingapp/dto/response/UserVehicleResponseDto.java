@@ -25,5 +25,6 @@ public class UserVehicleResponseDto {
     private String color;
     private Integer mileage;
     private String engineType;
+    private String modelName;
 
 }
