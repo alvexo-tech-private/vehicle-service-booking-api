@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -77,8 +78,8 @@ public class BookingController {
     }
     
     @Operation(summary = "Update booking status", description = "Mechanic or admin updates the status of a booking (e.g. CONFIRMED, COMPLETED, CANCELLED).")
-
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('MECHANIC', 'ADMINISTRATOR')")   
     public ResponseEntity<MyApiResponse<BookingResponse>> updateBookingStatus(
             @PathVariable Long id,
             @RequestParam BookingStatus status,

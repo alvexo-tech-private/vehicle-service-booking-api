@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,8 +46,9 @@ public class NotificationService {
     @Value("${app.from.email}")
     private String fromEmail;
     
+    @Async
     @Transactional
-    public Notification createNotification(User user, String title, String message, 
+    public void createNotification(User user, String title, String message, 
                                           NotificationType type, String entityType, Long entityId) {
         Notification notification = Notification.builder()
                 .user(user)
@@ -57,7 +59,7 @@ public class NotificationService {
                 .relatedEntityId(entityId)
                 .build();
         
-        return notificationRepository.save(notification);
+        notificationRepository.save(notification);
     }
     
     public Page<Notification> getUserNotifications(User user, Pageable pageable) {

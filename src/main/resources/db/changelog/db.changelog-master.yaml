@@ -27,3 +27,7 @@ databaseChangeLog:
       file: db/changelog/changes/013-create-otp-verifications-table.yaml
   - include:
       file: db/changelog/changes/014-add-area-workshopname-to-users.yaml
+  - include:
+      file: db/changelog/changes/015-booking-concurrency-guard.yaml
+  - include:
+      file: db/changelog/changes/016-add-break-windows-to-availability.yaml
