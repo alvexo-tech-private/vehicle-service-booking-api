@@ -46,7 +46,7 @@ public class AuthController {
 	}
 
 	@Operation(summary = "Register a vehicle user",
-		description = "Creates a new VEHICLE_USER account. Required: name, mobile, email, city, 4-digit PIN. Optional: area.")
+		description = "Creates a new VEHICLE_USER account. Required: name, mobile, email, city, 4-digit PIN., 4-digit confirm PIN,  Optional: area.")
 	@ApiResponses({
 		@ApiResponse(responseCode = "200", description = "Registered successfully"),
 		@ApiResponse(responseCode = "400", description = "Validation failed or email/mobile already registered")

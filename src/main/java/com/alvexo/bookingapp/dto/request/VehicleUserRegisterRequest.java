@@ -1,7 +1,10 @@
 package com.alvexo.bookingapp.dto.request;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -25,7 +28,13 @@ public class VehicleUserRegisterRequest {
     // Optional
     private String area;
 
-    @NotBlank(message = "PIN is required")
-    @Pattern(regexp = "^[0-9]{4}$", message = "PIN must be exactly 4 digits")
-    private String pin;
+    @NotNull(message = "PIN is required")
+    @Min(value = 1000, message = "PIN must be 4 digits")
+    @Max(value = 9999, message = "PIN must be 4 digits")
+    private Integer pin;
+   
+    @NotNull(message = "Confirm PIN is required")
+    @Min(value = 1000, message = "PIN must be 4 digits")
+    @Max(value = 9999, message = "PIN must be 4 digits")
+    private Integer confirmPin;
 }

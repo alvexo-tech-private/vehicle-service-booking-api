@@ -329,6 +329,10 @@ public class AuthService {
         if (userRepository.existsByMobileNumber(mobile)) {
             throw new BadRequestException("Mobile number already registered");
         }
+        
+        if(!request.getPin().equals((request.getConfirmPin()))){
+        	throw new BadRequestException("PIN and confirm PIN should be same");
+        }
 
         User user = User.builder()
                 .firstName(request.getName())
@@ -337,7 +341,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .city(request.getCity())
                 .area(request.getArea())
-                .password(passwordEncoder.encode(request.getPin()))
+                .password(passwordEncoder.encode(String.valueOf(request.getPin())))
                 .role(UserRole.VEHICLE_USER)
                 .active(true)
                 .build();
@@ -361,6 +365,9 @@ public class AuthService {
             throw new BadRequestException("Mobile number already registered");
         }
 
+        if(!request.getPin().equals((request.getConfirmPin()))){
+        	throw new BadRequestException("PIN and confirm PIN should be same");
+        }
         User user = User.builder()
                 .firstName(request.getName())
                 .lastName("")
@@ -368,7 +375,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .city(request.getCity())
                 .area(request.getArea())
-                .password(passwordEncoder.encode(request.getPin()))
+                .password(passwordEncoder.encode(String.valueOf(request.getPin())))
                 .workshopName(request.getWorkshopName())
                 .role(UserRole.MECHANIC)
                 .active(true)

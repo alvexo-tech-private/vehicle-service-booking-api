@@ -89,6 +89,7 @@ public class UserVehicleService {
                 .vehicleType(uv.getVehicle().getVehicleType().name())
                 .registraionYear(uv.getRegistraionYear())
                 .registrationNumber(uv.getRegistrationNumber())
+                .modelName(uv.getVehicle().getModel())
                 .build();
     }
 
