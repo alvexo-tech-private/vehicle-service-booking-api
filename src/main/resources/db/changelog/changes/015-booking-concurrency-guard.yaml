@@ -1,0 +1,45 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 015a-add-unique-constraint-mechanic-slot
+      author: system
+      comment: >
+        Adds a partial unique constraint to prevent double-booking at the DB level.
+        A mechanic cannot have two active bookings at the same scheduled_date_time.
+        CANCELLED and REJECTED bookings are excluded so a slot can be re-booked
+        after cancellation.
+
+        This is the hard backstop that protects against any race condition that
+        slips past the application-level pessimistic lock in BookingService.
+
+        PostgreSQL partial unique indexes support WHERE clauses — use a raw SQL
+        changeSet because Liquibase addUniqueConstraint does not support WHERE.
+      changes:
+        - sql:
+            sql: >
+              CREATE UNIQUE INDEX uq_mechanic_slot_active
+              ON bookings (mechanic_id, scheduled_date_time)
+              WHERE status NOT IN ('CANCELLED', 'REJECTED');
+      rollback:
+        - sql:
+            sql: DROP INDEX IF EXISTS uq_mechanic_slot_active;
+
+  - changeSet:
+      id: 015b-add-index-mechanic-scheduled-datetime
+      author: system
+      comment: >
+        Composite index on (mechanic_id, scheduled_date_time) to speed up
+        the conflict check query and the new findBookedSlotStartTimes query.
+        Both queries filter by mechanic_id + date range so this index is hit
+        directly without a full table scan.
+      changes:
+        - createIndex:
+            indexName: idx_bookings_mechanic_scheduled
+            tableName: bookings
+            columns:
+              - column: { name: mechanic_id }
+              - column: { name: scheduled_date_time }
+      rollback:
+        - dropIndex:
+            indexName: idx_bookings_mechanic_scheduled
+            tableName: bookings

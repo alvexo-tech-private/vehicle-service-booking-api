@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-add-break-windows-to-availability
+      author: system
+      comment: >
+        Adds break_windows JSONB column to mechanic_availability.
+        Breaks are stored as a JSON array — no separate table needed.
+        Example value: [{"start":"13:00","end":"14:00","label":"Lunch"}]
+        Slots overlapping a break window are excluded during on-demand slot computation.
+      changes:
+        - addColumn:
+            tableName: mechanic_availability
+            columns:
+              - column:
+                  name: break_windows
+                  type: jsonb
+                  defaultValue: '[]'
+                  constraints:
+                    nullable: true
+      rollback:
+        - dropColumn:
+            tableName: mechanic_availability
+            columnName: break_windows
