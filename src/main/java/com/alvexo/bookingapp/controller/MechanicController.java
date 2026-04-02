@@ -10,6 +10,7 @@ import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.MechanicService;
+import com.alvexo.bookingapp.util.MobileNumberUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -82,7 +83,7 @@ public class MechanicController {
     public ResponseEntity<MyApiResponse<List<AvailabilityResponse>>> getMechanicAvailabilityByMobileNumber(@PathVariable String mobileNumber, Authentication authentication) {
         userRepository.findByEmail(authentication.getName()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        User mechanicByPhone = userRepository.findByMobileNumber(mobileNumber).orElseThrow(() -> new ResourceNotFoundException("Mechanic not found with " + mobileNumber));
+        User mechanicByPhone = userRepository.findByMobileNumber(MobileNumberUtil.normalize(mobileNumber)).orElseThrow(() -> new ResourceNotFoundException("Mechanic not found with " + mobileNumber));
         List<AvailabilityResponse> availability = mechanicService.getMechanicAvailability(mechanicByPhone);
         return ResponseEntity.ok(MyApiResponse.success(availability));
     }
