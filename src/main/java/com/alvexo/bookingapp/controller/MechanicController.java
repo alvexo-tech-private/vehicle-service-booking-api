@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alvexo.bookingapp.dto.request.AvailabilityRequest;
 import com.alvexo.bookingapp.dto.request.WeeklyAvailabilityRequest;
 import com.alvexo.bookingapp.dto.response.AvailabilityResponse;
+import com.alvexo.bookingapp.dto.response.MechanicSearchResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.SlotResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
@@ -32,6 +33,7 @@ import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.MechanicService;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -204,5 +206,40 @@ public class MechanicController {
             @RequestParam(defaultValue = "10.0") double radiusKm) {
         return ResponseEntity.ok(MyApiResponse.success(
                 mechanicService.findNearbyMechanics(latitude, longitude, radiusKm)));
+    }
+ 
+    // ── City search ───────────────────────────────────────────────────────────
+ 
+    @Operation(
+        summary = "Find mechanics by city",
+        description = """
+            Returns active mechanics located in the given city.
+            Optionally narrow the results by providing an area (neighbourhood) within the city.
+            Both city and area comparisons are case-insensitive.
+ 
+            **Examples:**
+            - `/api/mechanics/search?city=Chennai` — all mechanics in Chennai
+            - `/api/mechanics/search?city=Chennai&area=Anna Nagar` — mechanics in Anna Nagar, Chennai
+            """
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "List of matching mechanics (empty list if none found)"),
+        @ApiResponse(responseCode = "400", description = "City parameter is blank")
+    })
+    @GetMapping("/search")
+    public ResponseEntity<MyApiResponse<List<MechanicSearchResponse>>> findMechanicsByCity(
+            @Parameter(description = "City name to search in (required)", example = "Chennai")
+            @RequestParam String city,
+ 
+            @Parameter(description = "Area / neighbourhood within the city (optional)", example = "Anna Nagar")
+            @RequestParam(required = false) String area) {
+ 
+        List<MechanicSearchResponse> mechanics = mechanicService.findMechanicsByCity(city, area);
+ 
+        String message = mechanics.isEmpty()
+                ? "No mechanics found in " + city + (area != null ? ", " + area : "")
+                : mechanics.size() + " mechanic(s) found in " + city + (area != null ? ", " + area : "");
+ 
+        return ResponseEntity.ok(MyApiResponse.success(message, mechanics));
     }
 }

@@ -23,8 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByMobileNumber(String mobileNumber);
     List<User> findByRole(UserRole role);
     Page<User> findByRole(UserRole role, Pageable pageable);
-    Optional<User> findByEmailOrMobileNumber(String mobileNumber,String email);
-    
+    Optional<User> findByEmailOrMobileNumber(String mobileNumber, String email);
+
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.active = true " +
            "AND (:latitude IS NULL OR :longitude IS NULL OR " +
            "(6371 * acos(cos(radians(:latitude)) * cos(radians(u.latitude)) * " +
@@ -34,4 +34,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                     @Param("latitude") BigDecimal latitude,
                                     @Param("longitude") BigDecimal longitude,
                                     @Param("radiusKm") double radiusKm);
+
+    /**
+     * Find active mechanics by city name (case-insensitive).
+     * Area filter is optional — pass null to skip it.
+     */
+    @Query("SELECT u FROM User u " +
+           "WHERE u.role = :role " +
+           "AND u.active = true " +
+           "AND LOWER(u.city) = LOWER(:city) " +
+           "AND (:area IS NULL OR LOWER(u.area) = LOWER(:area))")
+    List<User> findMechanicsByCityAndOptionalArea(
+            @Param("role") UserRole role,
+            @Param("city") String city,
+            @Param("area") String area);
 }

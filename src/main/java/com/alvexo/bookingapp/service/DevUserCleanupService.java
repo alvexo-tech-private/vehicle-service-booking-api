@@ -229,7 +229,7 @@ public class DevUserCleanupService {
 
         mechanicAvailabilityRepository.deleteAll(mechanicAvailabilityRepository.findAll().stream()
                 .filter(a -> a.getMechanic().getId().equals(uid))
-                .toList());
+                .toList()); 
 
         // 7. Referrals (as the sales rep who referred, or as the referred user)
         referralRepository.deleteAll(referralRepository.findAll().stream()

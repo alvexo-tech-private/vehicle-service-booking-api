@@ -4,6 +4,7 @@ import com.alvexo.bookingapp.dto.request.AvailabilityRequest;
 import com.alvexo.bookingapp.dto.request.WeeklyAvailabilityRequest;
 import com.alvexo.bookingapp.dto.response.AvailabilityResponse;
 import com.alvexo.bookingapp.dto.response.BreakWindowResponse;
+import com.alvexo.bookingapp.dto.response.MechanicSearchResponse;
 import com.alvexo.bookingapp.dto.response.SlotResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
@@ -310,5 +311,50 @@ public class MechanicService {
                 .latitude(user.getLatitude()).longitude(user.getLongitude())
                 .city(user.getCity()).state(user.getState())
                 .build();
+    }
+    
+    // ── City search ───────────────────────────────────────────────────────────
+    
+    /**
+     * Returns active mechanics matching the given city name.
+     * Area narrows the search further when provided (case-insensitive).
+     *
+     * @param city  required – name of the city
+     * @param area  optional – neighbourhood / area within the city (pass null to skip)
+     * @return list of matching mechanics mapped to {@link MechanicSearchResponse}
+     */
+    @Transactional(readOnly = true)
+    public List<MechanicSearchResponse> findMechanicsByCity(String city, String area) {
+        if (city == null || city.isBlank()) {
+            throw new BadRequestException("City name must not be blank");
+        }
+        return userRepository
+                .findMechanicsByCityAndOptionalArea(UserRole.MECHANIC, city.trim(), area != null ? area.trim() : null)
+                .stream()
+                .map(this::convertToMechanicSearchResponse)
+                .collect(Collectors.toList());
+    }
+    
+    private MechanicSearchResponse convertToMechanicSearchResponse(User user) {
+        return new MechanicSearchResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                user.getMobileNumber(),
+                user.getCity(),
+                user.getArea(),
+                user.getState(),
+                user.getWorkshopName(),
+                user.getSpecialization(),
+                user.getExperienceYears(),
+                user.getHourlyRate(),
+                user.getRating(),
+                user.getTotalReviews(),
+                user.getTotalBookingsCompleted(),
+                user.getBio(),
+                user.getLatitude(),
+                user.getLongitude()
+        );
     }
 }
