@@ -23,6 +23,10 @@ public class Constants {
     // Search
     public static final double DEFAULT_SEARCH_RADIUS_KM = 10.0;
     public static final double MAX_SEARCH_RADIUS_KM = 100.0;
+
+    // Mechanic preferences (vehicle user favourites)
+    // Change this value to adjust the per-user cap without touching any other code.
+    public static final int MAX_MECHANIC_PREFERENCES = 5;
     
     // Payment
     public static final String DEFAULT_CURRENCY = "USD";

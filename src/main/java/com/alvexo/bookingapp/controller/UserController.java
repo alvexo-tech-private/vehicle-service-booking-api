@@ -1,24 +1,27 @@
 package com.alvexo.bookingapp.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.alvexo.bookingapp.dto.request.ChangePinRequest;
 import com.alvexo.bookingapp.dto.request.UserUpdateRequest;
+import com.alvexo.bookingapp.dto.response.MechanicSearchResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.AuthService;
+import com.alvexo.bookingapp.service.PreferenceService;
+
+import java.util.List;
 
 @Tag(name = "Users", description = "Profile management and PIN change for all authenticated users. Requires JWT token.")
 @RestController
@@ -30,6 +33,9 @@ public class UserController {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private PreferenceService preferenceService;
 
     // -------------------------------------------------------------------------
     // Profile
@@ -101,6 +107,54 @@ public class UserController {
                 MyApiResponse.success("PIN changed successfully. Please log in again on all devices.", null));
     }
 
+    // -------------------------------------------------------------------------
+    // Mechanic Preferences (vehicle users only)
+    // -------------------------------------------------------------------------
+
+    @Operation(summary = "List preferred mechanics",
+               description = "Returns the vehicle user's bookmarked mechanics (active only), newest first. Max " +
+                             com.alvexo.bookingapp.util.Constants.MAX_MECHANIC_PREFERENCES + " entries.")
+    @GetMapping("/me/preferences/mechanics")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<List<MechanicSearchResponse>>> getPreferences(
+            Authentication authentication) {
+        User vehicleUser = resolveUser(authentication);
+        List<MechanicSearchResponse> preferences = preferenceService.getPreferences(vehicleUser);
+        String message = preferences.isEmpty()
+                ? "You have no preferred mechanics yet"
+                : preferences.size() + " preferred mechanic(s)";
+        return ResponseEntity.ok(MyApiResponse.success(message, preferences));
+    }
+
+    @Operation(summary = "Add a mechanic to preferences",
+               description = "Bookmarks a mechanic. Idempotent — adding an already-bookmarked mechanic returns 200 without error. " +
+                             "Fails if the mechanic is inactive or the cap is reached.")
+    @PostMapping("/me/preferences/mechanics/{mechanicId}")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<Void>> addPreference(
+            @PathVariable Long mechanicId,
+            Authentication authentication) {
+        User vehicleUser = resolveUser(authentication);
+        preferenceService.addPreference(vehicleUser, mechanicId);
+        return ResponseEntity.ok(MyApiResponse.success("Mechanic added to preferences", null));
+    }
+
+    @Operation(summary = "Remove a mechanic from preferences",
+               description = "Removes a bookmarked mechanic. Returns 404 if the mechanic was not in the user's preferences.")
+    @DeleteMapping("/me/preferences/mechanics/{mechanicId}")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<Void>> removePreference(
+            @PathVariable Long mechanicId,
+            Authentication authentication) {
+        User vehicleUser = resolveUser(authentication);
+        preferenceService.removePreference(vehicleUser, mechanicId);
+        return ResponseEntity.ok(MyApiResponse.success("Mechanic removed from preferences", null));
+    }
+
+    // -------------------------------------------------------------------------
+    // Public lookup
+    // -------------------------------------------------------------------------
+
     @Operation(summary = "Get user by ID", description = "Returns the public profile of any user by their database ID.")
     @GetMapping("/{id}")
     public ResponseEntity<MyApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
@@ -111,6 +165,11 @@ public class UserController {
         return ResponseEntity.ok(MyApiResponse.success(response));
     }
     
+    private User resolveUser(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
     private UserResponse convertToResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
