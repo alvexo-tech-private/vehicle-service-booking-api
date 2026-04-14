@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-add-area-workshopname-to-users
+      author: system
+      comment: "Add area (optional locality) and workshop_name (mechanic-specific) columns to users table"
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: area
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: workshop_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+        - createIndex:
+            indexName: idx_users_city_area
+            tableName: users
+            columns:
+              - column:
+                  name: city
+              - column:
+                  name: area
+      rollback:
+        - dropIndex:
+            indexName: idx_users_city_area
+            tableName: users
+        - dropColumn:
+            tableName: users
+            columnName: area
+        - dropColumn:
+            tableName: users
+            columnName: workshop_name

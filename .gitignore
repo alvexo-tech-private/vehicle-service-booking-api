@@ -6,6 +6,7 @@ target/
 
 ### STS ###
 .apt_generated
+.metadata
 .classpath
 .factorypath
 .project
@@ -15,6 +16,7 @@ target/
 
 ### IntelliJ IDEA ###
 .idea
+.metadata
 *.iws
 *.iml
 *.ipr

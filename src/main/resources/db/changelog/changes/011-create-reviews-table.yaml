@@ -1,0 +1,88 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-create-reviews-table
+      author: system
+      changes:
+        - createTable:
+            tableName: reviews
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: booking_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: vehicle_user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rating
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: comment
+                  type: TEXT
+              - column:
+                  name: response
+                  type: TEXT
+              - column:
+                  name: response_date
+                  type: TIMESTAMP
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: reviews
+            baseColumnNames: booking_id
+            constraintName: fk_reviews_booking
+            referencedTableName: bookings
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: reviews
+            baseColumnNames: mechanic_id
+            constraintName: fk_reviews_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: reviews
+            baseColumnNames: vehicle_user_id
+            constraintName: fk_reviews_vehicle_user
+            referencedTableName: users
+            referencedColumnNames: id
+        - createIndex:
+            indexName: idx_reviews_mechanic
+            tableName: reviews
+            columns:
+              - column:
+                  name: mechanic_id
+        - createIndex:
+            indexName: idx_reviews_rating
+            tableName: reviews
+            columns:
+              - column:
+                  name: rating
