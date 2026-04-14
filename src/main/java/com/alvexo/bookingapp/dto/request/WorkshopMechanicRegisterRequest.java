@@ -15,7 +15,7 @@ public class WorkshopMechanicRegisterRequest {
     private String name;
 
     @NotBlank(message = "Mobile number is required")
-    @Pattern(regexp = "^[0-9]{10,15}$", message = "Invalid mobile number")
+    @Pattern(regexp = "^[0-9]{10}$", message = "Invalid mobile number")
     private String mobileNumber;
 
     @NotBlank(message = "Email is required")
@@ -40,4 +40,8 @@ public class WorkshopMechanicRegisterRequest {
 
     @NotBlank(message = "Workshop name is required")
     private String workshopName;
+
+    @NotBlank(message = "postalCode is required")
+    @Pattern(regexp = "^[0-9]{6}$", message = "postalCode must be 6 digits")
+    private String postalCode;
 }

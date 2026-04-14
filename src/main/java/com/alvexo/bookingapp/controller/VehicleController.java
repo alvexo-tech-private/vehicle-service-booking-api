@@ -33,7 +33,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/vehicles")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMINISTRATOR')")
 public class VehicleController {
     
     @Autowired
@@ -46,6 +45,7 @@ public class VehicleController {
     
     @Operation(summary = "Create a vehicle", description = "Adds a new vehicle make/model to the catalogue.")
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<MyApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody VehicleRequest request,Authentication authentication) {
         log.info("Creating vehicle: {} {} {}", request.getManufacturer(), 

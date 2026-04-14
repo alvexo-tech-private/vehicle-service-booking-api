@@ -1,8 +1,10 @@
 package com.alvexo.bookingapp.service;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
+import com.alvexo.bookingapp.dto.request.*;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -10,17 +12,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.alvexo.bookingapp.dto.request.AdministratorRegisterRequest;
-import com.alvexo.bookingapp.dto.request.ChangePinRequest;
-import com.alvexo.bookingapp.dto.request.LoginRequest;
-import com.alvexo.bookingapp.dto.request.MobileLoginRequest;
-import com.alvexo.bookingapp.dto.request.MobileRegisterRequest;
-import com.alvexo.bookingapp.dto.request.RefreshTokenRequest;
-import com.alvexo.bookingapp.dto.request.RegisterRequest;
-import com.alvexo.bookingapp.dto.request.SalesRepresentativeRegisterRequest;
-import com.alvexo.bookingapp.dto.request.VehicleUserRegisterRequest;
-import com.alvexo.bookingapp.dto.request.VerifyOtpRequest;
-import com.alvexo.bookingapp.dto.request.WorkshopMechanicRegisterRequest;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.UnauthorizedException;
@@ -42,7 +33,6 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final ReferralService referralService;
     private final OtpServicebkp otpService;
-    private final RedisOtpService redisOtpService;
     private final NotificationService notificationService;
 
     public AuthService(
@@ -53,7 +43,6 @@ public class AuthService {
             JwtTokenProvider tokenProvider,
             ReferralService referralService,
             OtpServicebkp otpService,
-            RedisOtpService redisOtpService,
             NotificationService notificationService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -62,7 +51,6 @@ public class AuthService {
         this.tokenProvider = tokenProvider;
         this.referralService = referralService;
         this.otpService = otpService;
-        this.redisOtpService = redisOtpService;
         this.notificationService = notificationService;
     }
     
@@ -171,19 +159,8 @@ public class AuthService {
 
         notificationService.sendOtpEmail(mobile, otp);
     }
-    
-    @Transactional
-    public void sendOtpRedis(String mobileNumber) {
 
-        String mobile = MobileNumberUtil.normalize(mobileNumber);
 
-        User user = userRepository.findByMobileNumber(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        String otp = redisOtpService.generateOtp(mobile);
-
-        notificationService.sendOtpEmail(mobile, otp);
-    }
 
     @Transactional
     public TokenResponse verifyOtpAndLogin(VerifyOtpRequest request) {
@@ -198,18 +175,7 @@ public class AuthService {
         return createTokenResponse(user, request.getDeviceId(), request.getDeviceType());
     }
 
-    @Transactional
-    public TokenResponse verifyOtpAndLoginDB(VerifyOtpRequest request) {
 
-        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
-
-        redisOtpService.validateOtp(mobile, request.getOtp());
-
-        User user = userRepository.findByMobileNumber(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return createTokenResponse(user);
-    }
 
 
 
@@ -375,6 +341,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .city(request.getCity())
                 .area(request.getArea())
+                .postalCode(request.getPostalCode())
                 .password(passwordEncoder.encode(String.valueOf(request.getPin())))
                 .workshopName(request.getWorkshopName())
                 .role(UserRole.MECHANIC)
