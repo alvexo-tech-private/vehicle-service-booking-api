@@ -1,163 +1,156 @@
 package com.alvexo.bookingapp.service;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.Random;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.model.OtpVerification;
 import com.alvexo.bookingapp.repository.OtpVerificationRepository;
+import com.alvexo.bookingapp.util.OtpUtil;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class OtpService {
-    
-    @Autowired
-    private OtpVerificationRepository otpRepository;
-    
-    @Autowired(required = false)
-    private SmsService smsService; // Optional SMS service
-    
-    @Value("${otp.expiry.minutes:5}")
-    private int otpExpiryMinutes;
-    
-    @Value("${otp.max.attempts.per.hour:3}")
-    private int maxOtpAttemptsPerHour;
-    
-    private static final int OTP_LENGTH = 6;
-    private static final Random random = new Random();
-    
-    /**
-     * Generate and send OTP to mobile number
-     */
-    @Transactional
-    public OtpVerification generateAndSendOtp(String mobileNumber) {
-        // Validate mobile number format
-        if (!isValidMobileNumber(mobileNumber)) {
-            throw new BadRequestException("Invalid mobile number format");
-        }
-        
-        // Check rate limiting (prevent spam)
-        LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
-        long recentAttempts = otpRepository.countByMobileNumberAndVerifiedFalseAndCreatedAtAfter(
-                mobileNumber, oneHourAgo);
-        
-        if (recentAttempts >= maxOtpAttemptsPerHour) {
-            throw new BadRequestException(
-                    "Too many OTP requests. Please try again after some time.");
-        }
-        
-        // Generate OTP
-        String otp = generateOtp();
-        
-        // Calculate expiry time
-        LocalDateTime expiryTime = LocalDateTime.now().plusMinutes(otpExpiryMinutes);
-        
-        // Save OTP to database
-        OtpVerification otpVerification = OtpVerification.builder()
+
+    private final OtpVerificationRepository otpRepository;
+
+    public String generateAndSaveOtp(String mobileNumber) {
+
+        String otp = OtpUtil.generateOtp();
+
+        OtpVerification entity = OtpVerification.builder()
                 .mobileNumber(mobileNumber)
                 .otp(otp)
-                .expiryTime(expiryTime)
+                .expiryTime(LocalDateTime.now().plusMinutes(5))
                 .verified(false)
                 .build();
-        
-        otpVerification = otpRepository.save(otpVerification);
-        
-        // Send OTP via SMS
-       // sendOtpViaSms(mobileNumber, otp);
-        
-        // Don't return the actual OTP in production
-        return otpVerification;
+
+        otpRepository.save(entity);
+
+        return otp;
     }
-    
-    /**
-     * Verify OTP for a mobile number
-     */
-    @Transactional
-    public boolean verifyOtp(String mobileNumber, String otp) {
-        // Find the latest valid OTP
-        Optional<OtpVerification> otpOpt = otpRepository.findLatestValidOtp(
-                mobileNumber, LocalDateTime.now());
-        
-        if (otpOpt.isEmpty()) {
-            throw new BadRequestException("OTP not found or expired");
+
+    public boolean validateOtp(String mobileNumber, String otp) {
+
+        OtpVerification record = otpRepository
+                .findTopByMobileNumberOrderByCreatedAtDesc(mobileNumber)
+                .orElseThrow(() -> new RuntimeException("OTP not found"));
+
+        if (record.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("OTP expired");
         }
-        
-        OtpVerification otpVerification = otpOpt.get();
-        
-        // Check if OTP matches
-        if (!otpVerification.getOtp().equals(otp)) {
-            throw new BadRequestException("Invalid OTP");
+
+        if (!record.getOtp().equals(otp)) {
+            throw new RuntimeException("Invalid OTP");
         }
-        
-        // Mark as verified
-        otpVerification.setVerified(true);
-        otpRepository.save(otpVerification);
-        
+
+        record.setVerified(true);
+        otpRepository.save(record);
+
         return true;
     }
-    
+
+    // ── Email-change OTP flow ─────────────────────────────────────────────────
+
     /**
-     * Check if mobile number has a verified OTP (used before registration)
+     * Generates and persists an OTP record keyed by {@code newEmail}.
+     * The caller's current mobile number is stored alongside for context.
+     *
+     * @param newEmail      the email address the user wants to switch to (used as lookup key)
+     * @param currentMobile the user's existing mobile number (stored as non-key context)
+     * @return the generated 6-digit OTP string (caller must deliver it to newEmail)
      */
-    public boolean isMobileVerified(String mobileNumber) {
-        // Check if there's a verified OTP within the last 30 minutes
-        LocalDateTime thirtyMinutesAgo = LocalDateTime.now().minusMinutes(30);
-        
-        return otpRepository.findByMobileNumber(mobileNumber).stream()
-                .anyMatch(otp -> otp.getVerified() 
-                        && otp.getCreatedAt().isAfter(thirtyMinutesAgo));
+    public String generateAndSaveOtpForEmail(String newEmail, String currentMobile) {
+        String otp = OtpUtil.generateOtp();
+        OtpVerification entity = OtpVerification.builder()
+                .email(newEmail)
+                .mobileNumber(currentMobile)
+                .otp(otp)
+                .expiryTime(LocalDateTime.now().plusMinutes(5))
+                .verified(false)
+                .build();
+        otpRepository.save(entity);
+        return otp;
     }
-    
+
     /**
-     * Clean up expired OTPs (scheduled task)
+     * Validates the OTP for an email-change request.
+     * Looks up the most recent record by {@code newEmail} and checks expiry and value.
+     *
+     * @param newEmail the target email that was used when the OTP was generated
+     * @param otp      the code submitted by the user
+     * @throws BadRequestException if no OTP record exists, the OTP is expired, or the value is wrong
      */
-    @Transactional
-    public void cleanupExpiredOtps() {
-        otpRepository.deleteByExpiryTimeBefore(LocalDateTime.now());
-    }
-    
-    /**
-     * Generate random OTP
-     */
-    private String generateOtp() {
-        StringBuilder otp = new StringBuilder();
-        for (int i = 0; i < OTP_LENGTH; i++) {
-            otp.append(random.nextInt(10));
+    public void validateOtpByEmail(String newEmail, String otp) {
+        OtpVerification record = otpRepository
+                .findTopByEmailOrderByCreatedAtDesc(newEmail)
+                .orElseThrow(() -> new BadRequestException("OTP not found for the given email"));
+
+        if (record.isExpired()) {
+            throw new BadRequestException("OTP has expired. Please request a new one");
         }
-        return otp.toString();
-    }
-    
-    /**
-     * Send OTP via SMS
-     */
-    private void sendOtpViaSms(String mobileNumber, String otp) {
-        if (smsService != null) {
-            String message = String.format(
-                    "Your OTP for Vehicle Booking App is: %s. Valid for %d minutes.",
-                    otp, otpExpiryMinutes);
-            smsService.sendSms(mobileNumber, message);
-        } else {
-            // In development/testing, just log it
-            System.out.println("=================================");
-            System.out.println("OTP for " + mobileNumber + ": " + otp);
-            System.out.println("Expires at: " + LocalDateTime.now().plusMinutes(otpExpiryMinutes));
-            System.out.println("=================================");
+        if (record.getVerified()) {
+            throw new BadRequestException("OTP has already been used");
         }
-    }
-    
-    /**
-     * Validate mobile number format
-     */
-    private boolean isValidMobileNumber(String mobileNumber) {
-        if (mobileNumber == null || mobileNumber.trim().isEmpty()) {
-            return false;
+        if (!record.getOtp().equals(otp)) {
+            throw new BadRequestException("Invalid OTP");
         }
-        // 10-15 digits only
-        return mobileNumber.matches("^[0-9]{10,15}$");
+
+        record.setVerified(true);
+        otpRepository.save(record);
+    }
+
+    // ── Mobile-change OTP flow ────────────────────────────────────────────────
+
+    /**
+     * Generates and persists an OTP record keyed by {@code newMobile}.
+     * The caller's current email is stored alongside for context.
+     *
+     * @param newMobile    the mobile number the user wants to switch to (used as lookup key)
+     * @param currentEmail the user's existing email address (stored as non-key context)
+     * @return the generated 6-digit OTP string (caller must deliver it to the user)
+     */
+    public String generateAndSaveOtpForMobile(String newMobile, String currentEmail) {
+        String otp = OtpUtil.generateOtp();
+        OtpVerification entity = OtpVerification.builder()
+                .mobileNumber(newMobile)
+                .email(currentEmail)
+                .otp(otp)
+                .expiryTime(LocalDateTime.now().plusMinutes(5))
+                .verified(false)
+                .build();
+        otpRepository.save(entity);
+        return otp;
+    }
+
+    /**
+     * Validates the OTP for a mobile-change request.
+     * Reuses the existing mobile-keyed lookup; throws {@link BadRequestException}
+     * with user-friendly messages (unlike the login flow which throws RuntimeException).
+     *
+     * @param newMobile the target mobile number that was used when the OTP was generated
+     * @param otp       the code submitted by the user
+     * @throws BadRequestException if no OTP record exists, the OTP is expired, or the value is wrong
+     */
+    public void validateOtpByMobile(String newMobile, String otp) {
+        OtpVerification record = otpRepository
+                .findTopByMobileNumberOrderByCreatedAtDesc(newMobile)
+                .orElseThrow(() -> new BadRequestException("OTP not found for the given mobile number"));
+
+        if (record.isExpired()) {
+            throw new BadRequestException("OTP has expired. Please request a new one");
+        }
+        if (record.getVerified()) {
+            throw new BadRequestException("OTP has already been used");
+        }
+        if (!record.getOtp().equals(otp)) {
+            throw new BadRequestException("Invalid OTP");
+        }
+
+        record.setVerified(true);
+        otpRepository.save(record);
     }
 }

@@ -25,7 +25,9 @@ public class OtpVerification {
     private String mobileNumber;
 
 
-    @Column(name = "email", nullable = false, length = 50)
+    // Nullable: login-OTP flow keys by mobileNumber and has no email to supply.
+    // Email-change OTP flow populates this field with the new email as the lookup key.
+    @Column(name = "email", nullable = true, length = 50)
     private String email;
 
     @Column(nullable = false, length = 10)
