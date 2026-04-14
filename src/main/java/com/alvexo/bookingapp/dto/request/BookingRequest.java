@@ -25,7 +25,20 @@ public class BookingRequest {
     
     @NotBlank(message = "Description is required")
     private String description;
-    
+
+    /**
+     * FK → mechanic_service_settings.id
+     * Required when the mechanic operates in hour-slot mode (reserveCapacity = true).
+     * Optional in vehicle-count mode — can still be provided for reference.
+     */
+    private Long serviceSettingId;
+
+    /**
+     * Advance amount paid by the customer at booking time.
+     * Must match mechanic_settings.advance_amount when advanceEnabled = true.
+     */
+    private BigDecimal advancePaid;
+
     private BigDecimal estimatedCost;
     private Integer estimatedDurationMinutes;
     private String customerNotes;

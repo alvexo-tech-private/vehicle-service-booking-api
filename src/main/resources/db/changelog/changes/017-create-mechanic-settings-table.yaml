@@ -1,0 +1,117 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-create-mechanic-settings-table
+      author: system
+      comment: >
+        Creates mechanic_settings table — one row per mechanic.
+        Stores capacity mode (vehicle-count vs hour-slot), reporting times,
+        job card serial prefix, and advance payment config.
+        reserveCapacity drives the booking logic branch:
+          false → max_vehicles_per_day cap
+          true  → full_day_capacity_hours cap + express reporting time required
+      changes:
+        - createTable:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+
+              - column:
+                  name: max_vehicles_per_day
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reserve_capacity
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # Required when reserve_capacity = true
+              - column:
+                  name: full_day_capacity_hours
+                  type: DECIMAL(5,2)
+
+              - column:
+                  name: job_card_serial_prefix
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+
+              # Consolidated from serviceReportingHour / Minute / Period
+              - column:
+                  name: service_reporting_time
+                  type: TIME
+                  constraints:
+                    nullable: false
+
+              # Required when reserve_capacity = true
+              - column:
+                  name: express_reporting_time
+                  type: TIME
+
+              - column:
+                  name: advance_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # Required when advance_enabled = true
+              - column:
+                  name: advance_amount
+                  type: DECIMAL(10,2)
+
+              # Pure config JSON — UI prefs, not FK-referenced
+              - column:
+                  name: preferences
+                  type: JSONB
+                  defaultValue: '{}'
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_settings
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_settings_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_mechanic_settings_mechanic
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: mechanic_id
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_settings

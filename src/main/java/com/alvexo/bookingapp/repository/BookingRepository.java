@@ -1,9 +1,11 @@
 package com.alvexo.bookingapp.repository;
 
-import com.alvexo.bookingapp.model.Booking;
-import com.alvexo.bookingapp.model.BookingStatus;
-import com.alvexo.bookingapp.model.User;
-import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,10 +14,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import com.alvexo.bookingapp.model.Booking;
+import com.alvexo.bookingapp.model.BookingStatus;
+import com.alvexo.bookingapp.model.User;
+
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
@@ -67,4 +70,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
            "AND b.status NOT IN ('CANCELLED', 'REJECTED')")
     List<Booking> findAndLockConflicting(@Param("mechanic") User mechanic,
                                           @Param("scheduledDateTime") LocalDateTime scheduledDateTime);
+    
+ // 1. Counts active bookings for vehicle-count mode capacity check
+    @Query("""
+            SELECT COUNT(b) FROM Booking b
+            WHERE b.mechanic = :mechanic
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long countActiveBookingsForMechanicOnDate(@Param("mechanic") User mechanic,
+                                              @Param("date") LocalDate date);
+    
+ // 2. Used by job card number generator to produce a daily sequence
+    long countByMechanicAndJobCardNumberStartingWith(User mechanic, String prefix);
 }
