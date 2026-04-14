@@ -41,4 +41,10 @@ public interface OtpVerificationRepository extends JpaRepository<OtpVerification
      */
     long countByMobileNumberAndVerifiedFalseAndCreatedAtAfter(
             String mobileNumber, LocalDateTime since);
+
+    /**
+     * Find the most recent OTP record keyed by email address.
+     * Used by the email-change OTP flow.
+     */
+    Optional<OtpVerification> findTopByEmailOrderByCreatedAtDesc(String email);
 }

@@ -36,17 +36,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                     @Param("radiusKm") double radiusKm);
 
     /**
-     * Find active mechanics by city name (case-insensitive).
-     * Area filter is optional — pass null to skip it.
+     * Find active mechanics whose area starts with the given prefix (case-insensitive).
+     *
+     * <p>Uses a prefix LIKE pattern ({@code LOWER(area) LIKE LOWER(:prefix) || '%'}) so
+     * the B-tree index on {@code area} is fully utilised. A contains search
+     * ({@code '%value%'}) would bypass the index; use a pg_trgm GIN index for that
+     * if ever required.
      */
     @Query("SELECT u FROM User u " +
            "WHERE u.role = :role " +
            "AND u.active = true " +
-           "AND LOWER(u.city) = LOWER(:city) " +
-           "AND (:area IS NULL OR LOWER(u.area) = LOWER(:area))")
-    List<User> findMechanicsByCityAndOptionalArea(
+           "AND LOWER(u.area) LIKE LOWER(CONCAT(:area, '%'))")
+    List<User> findMechanicsByAreaPrefix(
             @Param("role") UserRole role,
-            @Param("city") String city,
             @Param("area") String area);
 
     /**

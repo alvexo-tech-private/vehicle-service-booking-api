@@ -90,6 +90,13 @@ databaseChangeLog:
               - column:
                   name: longitude
                   type: DECIMAL(11,8)
+              # Location fields — area is indexed for prefix-based mechanic search
+              - column:
+                  name: area
+                  type: VARCHAR(150)
+              - column:
+                  name: workshop_name
+                  type: VARCHAR(255)
               # Mechanic-specific fields
               - column:
                   name: specialization
@@ -175,3 +182,11 @@ databaseChangeLog:
                   name: latitude
               - column:
                   name: longitude
+        # B-tree index on area supports prefix LIKE ('Anna%') for mechanic search.
+        # For contains LIKE ('%Anna%'), use pg_trgm GIN index instead when needed.
+        - createIndex:
+            indexName: idx_users_area
+            tableName: users
+            columns:
+              - column:
+                  name: area

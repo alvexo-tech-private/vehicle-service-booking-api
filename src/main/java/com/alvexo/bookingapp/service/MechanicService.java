@@ -317,39 +317,41 @@ public class MechanicService {
 
     /**
      * Unified mechanic search across three mutually exclusive dimensions:
-     * city, mobile number, or postal/pin code.
+     * area (prefix match), mobile number, or postal/pin code.
      *
      * <p>Exactly one parameter must be non-blank. Providing more than one,
      * or none at all, is a client error ({@link BadRequestException}).
      *
-     * @param city         city name (case-insensitive); area optionally narrows the result
-     * @param area         neighbourhood within the city — only evaluated when city is supplied
+     * <p>Area search uses a prefix LIKE pattern ({@code area%}, case-insensitive)
+     * so the B-tree index on {@code users.area} is fully utilised.
+     *
+     * @param area         neighbourhood / locality prefix (e.g. "Anna" matches "Anna Nagar")
      * @param mobileNumber exact 10-digit mobile number
      * @param pinCode      exact 6-digit postal/pin code
      */
     @Transactional(readOnly = true)
     public List<MechanicSearchResponse> searchMechanics(
-            String city, String area, String mobileNumber, String pinCode) {
+            String area, String mobileNumber, String pinCode) {
 
-        boolean hasCity   = city != null && !city.isBlank();
-        boolean hasMobile = mobileNumber != null && !mobileNumber.isBlank();
+        boolean hasArea    = area != null && !area.isBlank();
+        boolean hasMobile  = mobileNumber != null && !mobileNumber.isBlank();
         boolean hasPinCode = pinCode != null && !pinCode.isBlank();
 
-        long providedCount = (hasCity ? 1 : 0) + (hasMobile ? 1 : 0) + (hasPinCode ? 1 : 0);
+        long providedCount = (hasArea ? 1 : 0) + (hasMobile ? 1 : 0) + (hasPinCode ? 1 : 0);
 
         if (providedCount == 0) {
             throw new BadRequestException(
-                    "Provide exactly one search parameter: city, mobile, or pinCode");
+                    "Provide exactly one search parameter: area, mobile, or pinCode");
         }
         if (providedCount > 1) {
             throw new BadRequestException(
-                    "Only one search parameter is allowed at a time: city, mobile, or pinCode");
+                    "Only one search parameter is allowed at a time: area, mobile, or pinCode");
         }
 
         List<User> results;
-        if (city != null && !city.isBlank()) {
-            results = userRepository.findMechanicsByCityAndOptionalArea(
-                    UserRole.MECHANIC, city.trim(), area != null ? area.trim() : null);
+        if (area != null && !area.isBlank()) {
+            results = userRepository.findMechanicsByAreaPrefix(
+                    UserRole.MECHANIC, area.trim());
         } else if (mobileNumber != null && !mobileNumber.isBlank()) {
             results = userRepository.findMechanicsByMobileNumber(
                     UserRole.MECHANIC, mobileNumber.trim());

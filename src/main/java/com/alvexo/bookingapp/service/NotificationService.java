@@ -116,6 +116,34 @@ public class NotificationService {
         System.out.println("Status Code: " + response.getStatusCode());
     }
     
+    // ── Contact-detail change OTP delivery ────────────────────────────────────
+
+    /**
+     * Sends an OTP to the user's <em>new</em> email address so they can prove
+     * ownership before the address is committed to the account.
+     */
+    public void sendEmailChangeOtp(String newEmail, String otp) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(newEmail);
+        message.setSubject("Verify your new email address");
+        message.setText("Your OTP to verify your new email address is: " + otp
+                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
+        mailSender.send(message);
+    }
+
+    /**
+     * Sends an OTP to the user's <em>current</em> email address so they can
+     * authorise a mobile number change. (SMS delivery is not yet implemented.)
+     */
+    public void sendMobileChangeOtp(String currentEmail, String otp) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(currentEmail);
+        message.setSubject("Verify your new mobile number");
+        message.setText("Your OTP to verify your new mobile number is: " + otp
+                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
+        mailSender.send(message);
+    }
+
     @Transactional
     public void markAsRead(Long notificationId, User user) {
         Notification notification = notificationRepository.findById(notificationId)

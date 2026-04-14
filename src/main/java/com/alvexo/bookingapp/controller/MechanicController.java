@@ -216,16 +216,15 @@ public class MechanicController {
             Returns active mechanics matching exactly one of the supported search dimensions.
             Exactly one parameter must be provided per request — mixing parameters returns 400.
 
-            | Parameter  | Type   | Description                                              |
-            |------------|--------|----------------------------------------------------------|
-            | `city`     | String | City name (case-insensitive). Combine with `area` to narrow to a neighbourhood. |
-            | `area`     | String | Neighbourhood within the city — only evaluated when `city` is present. |
-            | `mobile`   | String | Exact 10-digit mobile number registered to the mechanic. |
-            | `pinCode`  | String | Exact 6-digit postal / PIN code of the mechanic's workshop. |
+            | Parameter  | Type   | Description                                                                 |
+            |------------|--------|-----------------------------------------------------------------------------|
+            | `area`     | String | Locality / neighbourhood prefix (case-insensitive, prefix match). `Anna` matches `Anna Nagar`, `Anna Salai`, etc. |
+            | `mobile`   | String | Exact 10-digit mobile number registered to the mechanic.                    |
+            | `pinCode`  | String | Exact 6-digit postal / PIN code of the mechanic's workshop.                 |
 
             **Examples:**
-            - `/api/mechanics/search?city=Chennai` — all mechanics in Chennai
-            - `/api/mechanics/search?city=Chennai&area=Anna Nagar` — mechanics in Anna Nagar, Chennai
+            - `/api/mechanics/search?area=Anna Nagar` — mechanics in Anna Nagar
+            - `/api/mechanics/search?area=Anna` — mechanics in any area starting with "Anna"
             - `/api/mechanics/search?mobile=9000000005` — mechanic with that mobile number
             - `/api/mechanics/search?pinCode=600040` — mechanics whose workshop PIN code is 600040
             """
@@ -236,10 +235,7 @@ public class MechanicController {
     })
     @GetMapping("/search")
     public ResponseEntity<MyApiResponse<List<MechanicSearchResponse>>> searchMechanics(
-            @Parameter(description = "City name (case-insensitive)", example = "Chennai")
-            @RequestParam(required = false) String city,
-
-            @Parameter(description = "Neighbourhood within the city — only used alongside city", example = "Anna Nagar")
+            @Parameter(description = "Area / locality prefix (case-insensitive, prefix match)", example = "Anna Nagar")
             @RequestParam(required = false) String area,
 
             @Parameter(description = "Exact mobile number of the mechanic", example = "9000000005")
@@ -249,9 +245,9 @@ public class MechanicController {
             @RequestParam(required = false) String pinCode) {
 
         List<MechanicSearchResponse> mechanics =
-                mechanicService.searchMechanics(city, area, mobile, pinCode);
+                mechanicService.searchMechanics(area, mobile, pinCode);
 
-        String searchLabel = resolveSearchLabel(city, area, mobile, pinCode);
+        String searchLabel = resolveSearchLabel(area, mobile, pinCode);
         String message = mechanics.isEmpty()
                 ? "No mechanics found for " + searchLabel
                 : mechanics.size() + " mechanic(s) found for " + searchLabel;
@@ -259,9 +255,9 @@ public class MechanicController {
         return ResponseEntity.ok(MyApiResponse.success(message, mechanics));
     }
 
-    private String resolveSearchLabel(String city, String area, String mobile, String pinCode) {
-        if (city != null && !city.isBlank()) {
-            return "city: " + city.trim() + (area != null && !area.isBlank() ? ", area: " + area.trim() : "");
+    private String resolveSearchLabel(String area, String mobile, String pinCode) {
+        if (area != null && !area.isBlank()) {
+            return "area: " + area.trim();
         }
         if (mobile != null && !mobile.isBlank()) {
             return "mobile: " + mobile.trim();

@@ -5,6 +5,8 @@ import java.util.List;
 import com.alvexo.bookingapp.dto.request.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +21,7 @@ import com.alvexo.bookingapp.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -123,6 +126,112 @@ public class AuthController {
 	public ResponseEntity<MyApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
 		authService.logout(request.getRefreshToken());
 		return ResponseEntity.ok(MyApiResponse.success("Logout successful", null));
+	}
+
+	// ── Email change via OTP (authenticated) ──────────────────────────────────
+
+	@Operation(
+		summary = "Send OTP to verify new email address",
+		description = """
+			Sends a one-time password to the **new** email address the user wants to switch to.
+			The user must be logged in. The OTP must then be submitted to the verify endpoint
+			within 5 minutes to complete the change.
+
+			**Rules:**
+			- The new email must not already be registered to another account.
+			- After a successful verify, all refresh tokens are invalidated — the user
+			  must re-login on all devices because the JWT subject (email) has changed.
+			""")
+	@ApiResponses({
+		@ApiResponse(responseCode = "200", description = "OTP sent to the new email address"),
+		@ApiResponse(responseCode = "400", description = "New email already registered"),
+		@ApiResponse(responseCode = "401", description = "JWT token missing or invalid")
+	})
+	@SecurityRequirement(name = "bearerAuth")
+	@PreAuthorize("isAuthenticated()")
+	@PostMapping("/email-change/send-otp")
+	public ResponseEntity<MyApiResponse<Void>> sendEmailChangeOtp(
+			@Valid @RequestBody EmailChangeOtpRequest request,
+			Authentication authentication) {
+		authService.sendEmailChangeOtp(authentication.getName(), request.getNewEmail());
+		return ResponseEntity.ok(MyApiResponse.success(
+				"OTP sent to " + request.getNewEmail() + ". It is valid for 5 minutes.", null));
+	}
+
+	@Operation(
+		summary = "Verify OTP and update email address",
+		description = """
+			Validates the OTP received at the new email address and updates the account.
+			Submit the same new email used in the send-otp call together with the received code.
+
+			On success, **all existing refresh tokens are invalidated** — the user must
+			re-authenticate on all devices.
+			""")
+	@ApiResponses({
+		@ApiResponse(responseCode = "200", description = "Email updated successfully"),
+		@ApiResponse(responseCode = "400", description = "Invalid or expired OTP, or email already registered"),
+		@ApiResponse(responseCode = "401", description = "JWT token missing or invalid")
+	})
+	@SecurityRequirement(name = "bearerAuth")
+	@PreAuthorize("isAuthenticated()")
+	@PostMapping("/email-change/verify")
+	public ResponseEntity<MyApiResponse<Void>> verifyEmailChangeOtp(
+			@Valid @RequestBody EmailChangeVerifyRequest request,
+			Authentication authentication) {
+		authService.verifyEmailChangeOtp(authentication.getName(), request.getNewEmail(), request.getOtp());
+		return ResponseEntity.ok(MyApiResponse.success(
+				"Email address updated successfully. Please log in again on all devices.", null));
+	}
+
+	// ── Mobile change via OTP (authenticated) ─────────────────────────────────
+
+	@Operation(
+		summary = "Send OTP to verify new mobile number",
+		description = """
+			Sends a one-time password to the user's **current email address** to authorise
+			a mobile number change. (SMS delivery is not yet available.)
+			The user must be logged in. The OTP must be submitted to the verify endpoint
+			within 5 minutes to complete the change.
+
+			**Rules:**
+			- The new mobile number must not already be registered to another account.
+			- The number is normalised before storage (leading country code stripped if present).
+			""")
+	@ApiResponses({
+		@ApiResponse(responseCode = "200", description = "OTP sent to the user's current email"),
+		@ApiResponse(responseCode = "400", description = "New mobile number already registered or invalid format"),
+		@ApiResponse(responseCode = "401", description = "JWT token missing or invalid")
+	})
+	@SecurityRequirement(name = "bearerAuth")
+	@PreAuthorize("isAuthenticated()")
+	@PostMapping("/mobile-change/send-otp")
+	public ResponseEntity<MyApiResponse<Void>> sendMobileChangeOtp(
+			@Valid @RequestBody MobileChangeOtpRequest request,
+			Authentication authentication) {
+		authService.sendMobileChangeOtp(authentication.getName(), request.getNewMobile());
+		return ResponseEntity.ok(MyApiResponse.success(
+				"OTP sent to your registered email address. It is valid for 5 minutes.", null));
+	}
+
+	@Operation(
+		summary = "Verify OTP and update mobile number",
+		description = """
+			Validates the OTP received via email and updates the account's mobile number.
+			Submit the same new mobile number used in the send-otp call together with the received code.
+			""")
+	@ApiResponses({
+		@ApiResponse(responseCode = "200", description = "Mobile number updated successfully"),
+		@ApiResponse(responseCode = "400", description = "Invalid or expired OTP, or mobile number already registered"),
+		@ApiResponse(responseCode = "401", description = "JWT token missing or invalid")
+	})
+	@SecurityRequirement(name = "bearerAuth")
+	@PreAuthorize("isAuthenticated()")
+	@PostMapping("/mobile-change/verify")
+	public ResponseEntity<MyApiResponse<Void>> verifyMobileChangeOtp(
+			@Valid @RequestBody MobileChangeVerifyRequest request,
+			Authentication authentication) {
+		authService.verifyMobileChangeOtp(authentication.getName(), request.getNewMobile(), request.getOtp());
+		return ResponseEntity.ok(MyApiResponse.success("Mobile number updated successfully.", null));
 	}
 
 }

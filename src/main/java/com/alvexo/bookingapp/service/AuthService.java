@@ -1,7 +1,6 @@
 package com.alvexo.bookingapp.service;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 import com.alvexo.bookingapp.dto.request.*;
@@ -14,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
+import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.exception.UnauthorizedException;
 import com.alvexo.bookingapp.model.RefreshToken;
 import com.alvexo.bookingapp.model.User;
@@ -32,7 +32,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final ReferralService referralService;
-    private final OtpServicebkp otpService;
+    private final OtpService otpService;
     private final NotificationService notificationService;
 
     public AuthService(
@@ -42,7 +42,7 @@ public class AuthService {
             AuthenticationManager authenticationManager,
             JwtTokenProvider tokenProvider,
             ReferralService referralService,
-            OtpServicebkp otpService,
+            OtpService otpService,
             NotificationService notificationService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -460,6 +460,110 @@ public class AuthService {
 
         // 5. Invalidate all refresh tokens so other sessions must re-login
         refreshTokenRepository.deleteByUser(user);
+    }
+
+    // ── Contact detail change via OTP ─────────────────────────────────────────
+
+    /**
+     * Sends an OTP to {@code newEmail} so the user can prove ownership before
+     * the address is committed to their account.
+     *
+     * <p>Checks performed before generating the OTP:
+     * <ul>
+     *   <li>The caller must exist in the system (looked up by their current email from JWT).</li>
+     *   <li>The new email must not already be registered to another account.</li>
+     * </ul>
+     *
+     * @param currentEmail the authenticated user's current email (from JWT principal)
+     * @param newEmail     the email address the user wants to change to
+     */
+    @Transactional
+    public void sendEmailChangeOtp(String currentEmail, String newEmail) {
+        if (userRepository.existsByEmail(newEmail)) {
+            throw new BadRequestException("This email address is already registered to another account");
+        }
+        User user = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        String otp = otpService.generateAndSaveOtpForEmail(newEmail,
+                user.getMobileNumber() != null ? user.getMobileNumber() : "");
+        notificationService.sendEmailChangeOtp(newEmail, otp);
+    }
+
+    /**
+     * Verifies the OTP the user received at {@code newEmail} and, on success,
+     * updates the account's email address.
+     *
+     * <p>Because the JWT access token encodes the user's email as its subject,
+     * all existing refresh tokens are invalidated after the change — the user
+     * must re-authenticate on all devices.
+     *
+     * @param currentEmail the authenticated user's current email (from JWT principal)
+     * @param newEmail     the email address being verified
+     * @param otp          the code the user received
+     */
+    @Transactional
+    public void verifyEmailChangeOtp(String currentEmail, String newEmail, String otp) {
+        // Re-check: another request might have registered newEmail between send and verify
+        if (userRepository.existsByEmail(newEmail)) {
+            throw new BadRequestException("This email address is already registered to another account");
+        }
+        User user = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        otpService.validateOtpByEmail(newEmail, otp);
+
+        user.setEmail(newEmail);
+        userRepository.save(user);
+
+        // JWT subject is the email — existing tokens become invalid, force re-login
+        refreshTokenRepository.deleteByUser(user);
+    }
+
+    /**
+     * Sends an OTP to the user's <em>current</em> email address so they can
+     * authorise a mobile number change.
+     *
+     * <p>(SMS delivery is not yet implemented; the OTP is delivered via email.)
+     *
+     * @param currentEmail the authenticated user's current email (from JWT principal)
+     * @param newMobile    the mobile number the user wants to change to (raw, will be normalised)
+     */
+    @Transactional
+    public void sendMobileChangeOtp(String currentEmail, String newMobile) {
+        String normalizedMobile = MobileNumberUtil.normalize(newMobile);
+        if (userRepository.existsByMobileNumber(normalizedMobile)) {
+            throw new BadRequestException("This mobile number is already registered to another account");
+        }
+        User user = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        String otp = otpService.generateAndSaveOtpForMobile(normalizedMobile, user.getEmail());
+        notificationService.sendMobileChangeOtp(user.getEmail(), otp);
+    }
+
+    /**
+     * Verifies the OTP the user received and, on success, updates the account's
+     * mobile number.
+     *
+     * @param currentEmail the authenticated user's current email (from JWT principal)
+     * @param newMobile    the mobile number being verified (raw, will be normalised)
+     * @param otp          the code the user received
+     */
+    @Transactional
+    public void verifyMobileChangeOtp(String currentEmail, String newMobile, String otp) {
+        String normalizedMobile = MobileNumberUtil.normalize(newMobile);
+        // Re-check: another request might have registered newMobile between send and verify
+        if (userRepository.existsByMobileNumber(normalizedMobile)) {
+            throw new BadRequestException("This mobile number is already registered to another account");
+        }
+        User user = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        otpService.validateOtpByMobile(normalizedMobile, otp);
+
+        user.setMobileNumber(normalizedMobile);
+        userRepository.save(user);
     }
 
     private String generateUniqueReferralCode() {
