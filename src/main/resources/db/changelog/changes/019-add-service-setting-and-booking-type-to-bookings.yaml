@@ -1,0 +1,112 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-add-service-setting-and-booking-type-to-bookings
+      author: system
+      comment: >
+        Extends the bookings table with two new columns:
+
+        1. service_setting_id (FK → mechanic_service_settings.id, nullable)
+           Links a booking to a specific mechanic service configuration.
+           Used to:
+             - derive duration_minutes for hour-slot capacity checks
+             - enforce per-service daily caps (max_slots_per_day)
+           Nullable to preserve backward compatibility with existing bookings
+           that were created before this column was added.
+
+        2. booking_type ENUM('STANDARD', 'EXPRESS') default 'STANDARD'
+           Set at booking creation time based on scheduled time vs
+           mechanic's express_reporting_time:
+             - scheduledTime < expressReportingTime  → EXPRESS
+             - scheduledTime >= expressReportingTime → STANDARD
+           Only meaningful when mechanic's reserve_capacity = true.
+
+        3. job_card_number VARCHAR(30) unique nullable
+           Generated on booking confirmation using the mechanic's
+           job_card_serial_prefix + date + daily sequence.
+           e.g. "010125040801" = prefix "0101" + 250408 + seq 01
+
+        4. advance_paid DECIMAL(10,2) default 0.00
+           Tracks the advance amount collected at booking time.
+           Compared against mechanic_settings.advance_amount during confirmation.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: service_setting_id
+                  type: BIGINT
+
+              - column:
+                  name: booking_type
+                  type: VARCHAR(20)
+                  defaultValue: STANDARD
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: job_card_number
+                  type: VARCHAR(30)
+                  constraints:
+                    unique: true
+                    nullable: true
+
+              - column:
+                  name: advance_paid
+                  type: DECIMAL(10,2)
+                  defaultValueNumeric: 0.00
+
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: service_setting_id
+            constraintName: fk_bookings_service_setting
+            referencedTableName: mechanic_service_settings
+            referencedColumnNames: id
+            onDelete: RESTRICT
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_bookings_service_setting
+            tableName: bookings
+            columns:
+              - column:
+                  name: service_setting_id
+
+        - createIndex:
+            indexName: idx_bookings_booking_type
+            tableName: bookings
+            columns:
+              - column:
+                  name: booking_type
+
+        - createIndex:
+            indexName: idx_bookings_job_card_number
+            tableName: bookings
+            columns:
+              - column:
+                  name: job_card_number
+
+      rollback:
+        - dropIndex:
+            indexName: idx_bookings_job_card_number
+            tableName: bookings
+        - dropIndex:
+            indexName: idx_bookings_booking_type
+            tableName: bookings
+        - dropIndex:
+            indexName: idx_bookings_service_setting
+            tableName: bookings
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_service_setting
+        - dropColumn:
+            tableName: bookings
+            columnName: advance_paid
+        - dropColumn:
+            tableName: bookings
+            columnName: job_card_number
+        - dropColumn:
+            tableName: bookings
+            columnName: booking_type
+        - dropColumn:
+            tableName: bookings
+            columnName: service_setting_id

@@ -31,3 +31,10 @@ databaseChangeLog:
       file: db/changelog/changes/015-booking-concurrency-guard.yaml
   - include:
       file: db/changelog/changes/016-add-break-windows-to-availability.yaml
+  # ── Mechanic Settings feature ────────────────────────────────────────────────
+  - include:
+      file: db/changelog/changes/017-create-mechanic-settings-table.yaml
+  - include:
+      file: db/changelog/changes/018-create-mechanic-service-settings-table.yaml
+  - include:
+      file: db/changelog/changes/019-add-service-setting-and-booking-type-to-bookings.yaml

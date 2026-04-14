@@ -1,0 +1,99 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-create-mechanic-service-settings-table
+      author: system
+      comment: >
+        Creates mechanic_service_settings table — one row per service offered by a mechanic.
+        FK-referenced by bookings.service_setting_id so each booking knows which service
+        was booked and how long it takes (used for hour-slot capacity calculation).
+        is_active enables soft-delete: inactive services are hidden from customers
+        but preserved for historical booking references.
+      changes:
+        - createTable:
+            tableName: mechanic_service_settings
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: service_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: duration_minutes
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              # NULL means no per-service cap — only global day capacity applies
+              - column:
+                  name: max_slots_per_day
+                  type: INT
+
+              - column:
+                  name: is_express_eligible
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_service_settings
+            baseColumnNames: mechanic_id
+            constraintName: fk_mss_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_mss_mechanic_id
+            tableName: mechanic_service_settings
+            columns:
+              - column:
+                  name: mechanic_id
+
+        - createIndex:
+            indexName: idx_mss_mechanic_active
+            tableName: mechanic_service_settings
+            columns:
+              - column:
+                  name: mechanic_id
+              - column:
+                  name: is_active
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_service_settings
