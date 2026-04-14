@@ -1,0 +1,59 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 020-create-user-mechanic-preferences-table
+      author: system
+      comment: >
+        Stores a vehicle user's preferred (bookmarked) mechanics.
+        A user may have at most MAX_MECHANIC_PREFERENCES entries — enforced in
+        PreferenceService; the DB unique constraint prevents duplicate adds even
+        under concurrent requests.
+      changes:
+        - createTable:
+            tableName: user_mechanic_preferences
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: vehicle_user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_preference_vehicle_user
+                    references: users(id)
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_preference_mechanic
+                    references: users(id)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        # Prevents a user from adding the same mechanic more than once.
+        - addUniqueConstraint:
+            tableName: user_mechanic_preferences
+            columnNames: vehicle_user_id, mechanic_id
+            constraintName: uq_preference_user_mechanic
+
+        # Speeds up GET /me/preferences/mechanics — filters by vehicle_user_id.
+        - createIndex:
+            indexName: idx_preferences_vehicle_user_id
+            tableName: user_mechanic_preferences
+            columns:
+              - column:
+                  name: vehicle_user_id
+
+      rollback:
+        - dropTable:
+            tableName: user_mechanic_preferences

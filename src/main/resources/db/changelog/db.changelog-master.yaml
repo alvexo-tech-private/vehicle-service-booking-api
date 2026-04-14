@@ -36,3 +36,6 @@ databaseChangeLog:
       file: db/changelog/changes/018-create-mechanic-service-settings-table.yaml
   - include:
       file: db/changelog/changes/019-add-service-setting-and-booking-type-to-bookings.yaml
+  # ── Mechanic Preferences feature ─────────────────────────────────────────────
+  - include:
+      file: db/changelog/changes/020-create-user-mechanic-preferences-table.yaml
