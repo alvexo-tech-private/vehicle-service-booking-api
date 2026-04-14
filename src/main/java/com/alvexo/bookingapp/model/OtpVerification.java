@@ -24,6 +24,10 @@ public class OtpVerification {
     @Column(name = "mobile_number", nullable = false, length = 20)
     private String mobileNumber;
 
+
+    @Column(name = "email", nullable = false, length = 50)
+    private String email;
+
     @Column(nullable = false, length = 10)
     private String otp;
 

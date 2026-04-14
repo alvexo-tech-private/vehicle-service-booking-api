@@ -2,6 +2,7 @@ package com.alvexo.bookingapp.controller;
 
 import java.util.List;
 
+import com.alvexo.bookingapp.dto.request.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,12 +11,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.alvexo.bookingapp.dto.request.LoginRequest;
-import com.alvexo.bookingapp.dto.request.RefreshTokenRequest;
-import com.alvexo.bookingapp.dto.request.SendOtpRequest;
-import com.alvexo.bookingapp.dto.request.VehicleUserRegisterRequest;
-import com.alvexo.bookingapp.dto.request.VerifyOtpRequest;
-import com.alvexo.bookingapp.dto.request.WorkshopMechanicRegisterRequest;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.model.UserRole;
@@ -90,7 +85,7 @@ public class AuthController {
 		@ApiResponse(responseCode = "200", description = "OTP sent successfully"),
 		@ApiResponse(responseCode = "404", description = "Mobile number not found")
 	})
-	@PostMapping("/mobile/send-otp")
+	@PostMapping("/send-otp")
 	public ResponseEntity<MyApiResponse<String>> sendOtp(@RequestBody SendOtpRequest request) {
 		authService.sendOtp(request.getMobileNumber());
 		return ResponseEntity.ok(MyApiResponse.success("OTP sent", "SUCCESS"));
@@ -102,7 +97,8 @@ public class AuthController {
 		@ApiResponse(responseCode = "200", description = "OTP verified, login successful"),
 		@ApiResponse(responseCode = "400", description = "Invalid or expired OTP")
 	})
-	@PostMapping("/mobile/verify-otp")
+
+	@PostMapping("/verify-otp")
 	public ResponseEntity<MyApiResponse<TokenResponse>> verifyOtp(@RequestBody VerifyOtpRequest request) {
 		TokenResponse token = authService.verifyOtpAndLogin(request);
 		return ResponseEntity.ok(MyApiResponse.success("Login successful", token));

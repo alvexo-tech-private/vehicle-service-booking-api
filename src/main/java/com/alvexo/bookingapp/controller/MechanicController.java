@@ -208,38 +208,67 @@ public class MechanicController {
                 mechanicService.findNearbyMechanics(latitude, longitude, radiusKm)));
     }
  
-    // ── City search ───────────────────────────────────────────────────────────
- 
+    // ── Unified mechanic search ───────────────────────────────────────────────
+
     @Operation(
-        summary = "Find mechanics by city",
+        summary = "Search mechanics",
         description = """
-            Returns active mechanics located in the given city.
-            Optionally narrow the results by providing an area (neighbourhood) within the city.
-            Both city and area comparisons are case-insensitive.
- 
+            Returns active mechanics matching exactly one of the supported search dimensions.
+            Exactly one parameter must be provided per request — mixing parameters returns 400.
+
+            | Parameter  | Type   | Description                                              |
+            |------------|--------|----------------------------------------------------------|
+            | `city`     | String | City name (case-insensitive). Combine with `area` to narrow to a neighbourhood. |
+            | `area`     | String | Neighbourhood within the city — only evaluated when `city` is present. |
+            | `mobile`   | String | Exact 10-digit mobile number registered to the mechanic. |
+            | `pinCode`  | String | Exact 6-digit postal / PIN code of the mechanic's workshop. |
+
             **Examples:**
             - `/api/mechanics/search?city=Chennai` — all mechanics in Chennai
             - `/api/mechanics/search?city=Chennai&area=Anna Nagar` — mechanics in Anna Nagar, Chennai
+            - `/api/mechanics/search?mobile=9000000005` — mechanic with that mobile number
+            - `/api/mechanics/search?pinCode=600040` — mechanics whose workshop PIN code is 600040
             """
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "List of matching mechanics (empty list if none found)"),
-        @ApiResponse(responseCode = "400", description = "City parameter is blank")
+        @ApiResponse(responseCode = "400", description = "No search parameter provided, or more than one provided simultaneously")
     })
     @GetMapping("/search")
-    public ResponseEntity<MyApiResponse<List<MechanicSearchResponse>>> findMechanicsByCity(
-            @Parameter(description = "City name to search in (required)", example = "Chennai")
-            @RequestParam String city,
- 
-            @Parameter(description = "Area / neighbourhood within the city (optional)", example = "Anna Nagar")
-            @RequestParam(required = false) String area) {
- 
-        List<MechanicSearchResponse> mechanics = mechanicService.findMechanicsByCity(city, area);
- 
+    public ResponseEntity<MyApiResponse<List<MechanicSearchResponse>>> searchMechanics(
+            @Parameter(description = "City name (case-insensitive)", example = "Chennai")
+            @RequestParam(required = false) String city,
+
+            @Parameter(description = "Neighbourhood within the city — only used alongside city", example = "Anna Nagar")
+            @RequestParam(required = false) String area,
+
+            @Parameter(description = "Exact mobile number of the mechanic", example = "9000000005")
+            @RequestParam(required = false) String mobile,
+
+            @Parameter(description = "Exact postal / PIN code of the mechanic's workshop", example = "600040")
+            @RequestParam(required = false) String pinCode) {
+
+        List<MechanicSearchResponse> mechanics =
+                mechanicService.searchMechanics(city, area, mobile, pinCode);
+
+        String searchLabel = resolveSearchLabel(city, area, mobile, pinCode);
         String message = mechanics.isEmpty()
-                ? "No mechanics found in " + city + (area != null ? ", " + area : "")
-                : mechanics.size() + " mechanic(s) found in " + city + (area != null ? ", " + area : "");
- 
+                ? "No mechanics found for " + searchLabel
+                : mechanics.size() + " mechanic(s) found for " + searchLabel;
+
         return ResponseEntity.ok(MyApiResponse.success(message, mechanics));
+    }
+
+    private String resolveSearchLabel(String city, String area, String mobile, String pinCode) {
+        if (city != null && !city.isBlank()) {
+            return "city: " + city.trim() + (area != null && !area.isBlank() ? ", area: " + area.trim() : "");
+        }
+        if (mobile != null && !mobile.isBlank()) {
+            return "mobile: " + mobile.trim();
+        }
+        if (pinCode != null && !pinCode.isBlank()) {
+            return "pin code: " + pinCode.trim();
+        }
+        return "the given criteria";
     }
 }

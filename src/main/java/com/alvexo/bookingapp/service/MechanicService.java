@@ -313,24 +313,55 @@ public class MechanicService {
                 .build();
     }
     
-    // ── City search ───────────────────────────────────────────────────────────
-    
+    // ── Unified mechanic search ───────────────────────────────────────────────
+
     /**
-     * Returns active mechanics matching the given city name.
-     * Area narrows the search further when provided (case-insensitive).
+     * Unified mechanic search across three mutually exclusive dimensions:
+     * city, mobile number, or postal/pin code.
      *
-     * @param city  required – name of the city
-     * @param area  optional – neighbourhood / area within the city (pass null to skip)
-     * @return list of matching mechanics mapped to {@link MechanicSearchResponse}
+     * <p>Exactly one parameter must be non-blank. Providing more than one,
+     * or none at all, is a client error ({@link BadRequestException}).
+     *
+     * @param city         city name (case-insensitive); area optionally narrows the result
+     * @param area         neighbourhood within the city — only evaluated when city is supplied
+     * @param mobileNumber exact 10-digit mobile number
+     * @param pinCode      exact 6-digit postal/pin code
      */
     @Transactional(readOnly = true)
-    public List<MechanicSearchResponse> findMechanicsByCity(String city, String area) {
-        if (city == null || city.isBlank()) {
-            throw new BadRequestException("City name must not be blank");
+    public List<MechanicSearchResponse> searchMechanics(
+            String city, String area, String mobileNumber, String pinCode) {
+
+        boolean hasCity   = city != null && !city.isBlank();
+        boolean hasMobile = mobileNumber != null && !mobileNumber.isBlank();
+        boolean hasPinCode = pinCode != null && !pinCode.isBlank();
+
+        long providedCount = (hasCity ? 1 : 0) + (hasMobile ? 1 : 0) + (hasPinCode ? 1 : 0);
+
+        if (providedCount == 0) {
+            throw new BadRequestException(
+                    "Provide exactly one search parameter: city, mobile, or pinCode");
         }
-        return userRepository
-                .findMechanicsByCityAndOptionalArea(UserRole.MECHANIC, city.trim(), area != null ? area.trim() : null)
-                .stream()
+        if (providedCount > 1) {
+            throw new BadRequestException(
+                    "Only one search parameter is allowed at a time: city, mobile, or pinCode");
+        }
+
+        List<User> results;
+        if (city != null && !city.isBlank()) {
+            results = userRepository.findMechanicsByCityAndOptionalArea(
+                    UserRole.MECHANIC, city.trim(), area != null ? area.trim() : null);
+        } else if (mobileNumber != null && !mobileNumber.isBlank()) {
+            results = userRepository.findMechanicsByMobileNumber(
+                    UserRole.MECHANIC, mobileNumber.trim());
+        } else if (pinCode != null && !pinCode.isBlank()) {
+            results = userRepository.findMechanicsByPostalCode(
+                    UserRole.MECHANIC, pinCode.trim());
+        } else {
+            // Unreachable: providedCount == 1 guarantees one branch matched above.
+            results = List.of();
+        }
+
+        return results.stream()
                 .map(this::convertToMechanicSearchResponse)
                 .collect(Collectors.toList());
     }

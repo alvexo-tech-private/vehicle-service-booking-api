@@ -48,4 +48,27 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("role") UserRole role,
             @Param("city") String city,
             @Param("area") String area);
+
+    /**
+     * Find an active mechanic by exact mobile number.
+     * Mobile numbers are unique, so this returns at most one result.
+     */
+    @Query("SELECT u FROM User u " +
+           "WHERE u.role = :role " +
+           "AND u.active = true " +
+           "AND u.mobileNumber = :mobileNumber")
+    List<User> findMechanicsByMobileNumber(
+            @Param("role") UserRole role,
+            @Param("mobileNumber") String mobileNumber);
+
+    /**
+     * Find active mechanics by postal/pin code (exact match).
+     */
+    @Query("SELECT u FROM User u " +
+           "WHERE u.role = :role " +
+           "AND u.active = true " +
+           "AND u.postalCode = :postalCode")
+    List<User> findMechanicsByPostalCode(
+            @Param("role") UserRole role,
+            @Param("postalCode") String postalCode);
 }
