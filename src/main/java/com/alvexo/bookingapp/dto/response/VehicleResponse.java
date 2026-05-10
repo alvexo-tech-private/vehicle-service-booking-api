@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+import com.alvexo.bookingapp.model.FuelType;
 import com.alvexo.bookingapp.model.VehicleType;
 
 @Data
@@ -19,13 +20,9 @@ public class VehicleResponse {
     private String model;
     private Integer year;
     private String vin;
-    private String licensePlate;
     private VehicleType vehicleType;
     private String color;
-    private Integer mileage;
-    private String engineType;
-    private String transmissionType;
-    private String fuelType;
+    private FuelType fuelType;
     private String imageUrl;
     private Boolean active;
     private LocalDateTime createdAt;

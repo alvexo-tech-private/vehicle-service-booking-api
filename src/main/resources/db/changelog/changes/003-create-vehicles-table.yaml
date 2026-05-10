@@ -34,9 +34,6 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: engine_type
-                  type: VARCHAR(50)
-              - column:
                   name: fuel_type
                   type: VARCHAR(50)
               - column:

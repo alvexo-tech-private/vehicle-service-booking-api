@@ -30,18 +30,14 @@ public class Vehicle {
     
     @Column(name = "year")   // ← add this
     private Integer year;
-    
-    
+
     @Enumerated(EnumType.STRING)
     @Column(name = "vehicle_type", nullable = false, length = 50)
     private VehicleType vehicleType;
-    
-    
-    @Column(name = "engine_type", length = 50)
-    private String engineType;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "fuel_type", length = 50)
-    private String fuelType;
+    private FuelType fuelType;
     
     
     @Column(name = "image_url", length = 500)
