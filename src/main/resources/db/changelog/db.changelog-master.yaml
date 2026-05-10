@@ -41,7 +41,6 @@ databaseChangeLog:
       file: db/changelog/changes/020-create-user-mechanic-preferences-table.yaml
   # ── Vehicle Catalogue Seed Data ───────────────────────────────────────────────
   - include:
-      - include:
           file: db/changelog/changes/021-seed-system-admin-user.yaml
-      - include:
+  - include:
           file: db/changelog/changes/022-seed-vehicle-catalogue.yaml

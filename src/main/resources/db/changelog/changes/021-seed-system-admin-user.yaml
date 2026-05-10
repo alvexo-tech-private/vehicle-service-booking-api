@@ -1,60 +1,52 @@
 databaseChangeLog:
-        - changeSet:
-                  id: 021-seed-system-admin-user
-                  author: system
-                  context: dev
-                  runOnChange: false
+  - changeSet:
+      id: 021-seed-system-admin-user
+      author: system
+      context: dev
+      runOnChange: false
 
-                  preConditions:
-                          onFail: MARK_RAN
-                                  - sqlCheck:
-                                            expectedResult: 0
-                                            sql: SELECT COUNT(*) FROM users WHERE role = 'ADMINISTRATOR'
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 0
+            sql: SELECT COUNT(*) FROM users WHERE role = 'ADMINISTRATOR'
 
-                  changes:
-                          - insert:
-                                    tableName: users
-                                    columns:
-                                            - column:
-                                                      name: email
-                                                      value: "admin@alvexotech.com"
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: first_name
+                  value: system
 
-                                            - column:
-                                                      name: mobile_number
-                                                      value: "9500095000"
+              - column:
+                  name: last_name
+                  value: admin
 
-                                            - column:
-                                                      name: password
-                                                      value: "$2a$10$7QfDcMBFPMH3nHCpCg6hIuUmHAVKAMRr9P3UdVnRRKFSPsHg6Qdxm"
+              - column:
+                  name: password
+                  value: $2a$10$7QfDcMBFPMH3nHCpCg6hIuUmHAVKAMRr9P3UdVnRRKFSPsHg6Qdxm
 
-                                            - column:
-                                                      name: first_name
-                                                      value: "Default"
+              - column:
+                  name: role
+                  value: ADMINISTRATOR
 
-                                            - column:
-                                                      name: last_name
-                                                      value: "Admin"
+              - column:
+                  name: email
+                  value: admin@alvexotech.com
 
-                                            - column:
-                                                      name: role
-                                                      value: "ADMINISTRATOR"
+              - column:
+                  name: mobile_number
+                  value: 9694066294
 
-                                            - column:
-                                                      name: active
-                                                      valueBoolean: true
+              - column:
+                  name: active
+                  valueBoolean: true
 
-                                            - column:
-                                                      name: email_verified
-                                                      valueBoolean: false
+              - column:
+                  name: created_at
+                  valueDate: NOW()
 
-                                            - column:
-                                                      name: mobile_verified
-                                                      valueBoolean: false
-
-                                            - column:
-                                                      name: created_at
-                                                      valueComputed: "NOW()"
-
-                                            - column:
-                                                      name: updated_at
-                                                      valueComputed: "NOW()"
+              - column:
+                  name: updated_at
+                  valueDate: NOW()
