@@ -1,0 +1,60 @@
+databaseChangeLog:
+        - changeSet:
+                  id: 021-seed-system-admin-user
+                  author: system
+                  context: dev
+                  runOnChange: false
+
+                  preConditions:
+                          onFail: MARK_RAN
+                                  - sqlCheck:
+                                            expectedResult: 0
+                                            sql: SELECT COUNT(*) FROM users WHERE role = 'ADMINISTRATOR'
+
+                  changes:
+                          - insert:
+                                    tableName: users
+                                    columns:
+                                            - column:
+                                                      name: email
+                                                      value: "admin@alvexotech.com"
+
+                                            - column:
+                                                      name: mobile_number
+                                                      value: "9500095000"
+
+                                            - column:
+                                                      name: password
+                                                      value: "$2a$10$7QfDcMBFPMH3nHCpCg6hIuUmHAVKAMRr9P3UdVnRRKFSPsHg6Qdxm"
+
+                                            - column:
+                                                      name: first_name
+                                                      value: "Default"
+
+                                            - column:
+                                                      name: last_name
+                                                      value: "Admin"
+
+                                            - column:
+                                                      name: role
+                                                      value: "ADMINISTRATOR"
+
+                                            - column:
+                                                      name: active
+                                                      valueBoolean: true
+
+                                            - column:
+                                                      name: email_verified
+                                                      valueBoolean: false
+
+                                            - column:
+                                                      name: mobile_verified
+                                                      valueBoolean: false
+
+                                            - column:
+                                                      name: created_at
+                                                      valueComputed: "NOW()"
+
+                                            - column:
+                                                      name: updated_at
+                                                      valueComputed: "NOW()"
