@@ -10,14 +10,18 @@ import com.alvexo.bookingapp.dto.request.VehicleRequest;
 import com.alvexo.bookingapp.dto.response.VehicleResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
+import com.alvexo.bookingapp.model.FuelType;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.model.Vehicle;
 import com.alvexo.bookingapp.repository.VehicleRepository;
 
+import java.util.Arrays;
+import java.util.List;
+
 @Service
 public class VehicleService {
-    
+
     @Autowired
     private VehicleRepository vehicleRepository;
     
@@ -32,7 +36,7 @@ public class VehicleService {
                 .make(request.getManufacturer())
                 .model(request.getModelName())
                 .year(request.getYear())
-                .vehicleType(request.getVehicleType())
+                .fuelType(request.getFuelType())
                 .imageUrl(request.getImageUrl())
                 .createdBy(admin)
                 .build();
@@ -53,7 +57,8 @@ public class VehicleService {
         vehicle.setMake(request.getManufacturer());
         vehicle.setModel(request.getModelName());
         vehicle.setYear(request.getYear());
-        vehicle.setVehicleType(request.getVehicleType());
+        //vehicle.setVehicleType(request.getVehicleType());
+        vehicle.setFuelType(request.getFuelType());
         vehicle.setImageUrl(request.getImageUrl());
         
         vehicle = vehicleRepository.save(vehicle);
@@ -83,15 +88,39 @@ public class VehicleService {
         return vehicleRepository.findByActiveTrue(pageable)
                 .map(this::convertToResponse);
     }
-    
+
+    // ── Catalogue filter methods ─────────────────────────────────────────────
+
+    public List<FuelType> getAllFuelTypes() {
+        return Arrays.asList(FuelType.values());
+    }
+
+    public List<String> getManufacturersByFuelType(FuelType fuelType) {
+        return vehicleRepository.findDistinctManufacturersByFuelType(fuelType);
+    }
+
+    public Page<VehicleResponse> getVehiclesByFilter(FuelType fuelType, String manufacturer, Pageable pageable) {
+        if (fuelType != null && manufacturer != null && !manufacturer.isBlank()) {
+            return vehicleRepository
+                    .findByActiveTrueAndFuelTypeAndMakeIgnoreCase(fuelType, manufacturer, pageable)
+                    .map(this::convertToResponse);
+        } else if (fuelType != null) {
+            return vehicleRepository
+                    .findByActiveTrueAndFuelType(fuelType, pageable)
+                    .map(this::convertToResponse);
+        }
+        return getAllActiveVehicles(pageable);
+    }
+
+    // ── Mapper ───────────────────────────────────────────────────────────────
+
     private VehicleResponse convertToResponse(Vehicle vehicle) {
         return VehicleResponse.builder()
                 .id(vehicle.getId())
                 .make(vehicle.getMake())
                 .model(vehicle.getModel())
                 .year(vehicle.getYear())
-                .vehicleType(vehicle.getVehicleType())
-                .engineType(vehicle.getEngineType())
+                .fuelType(vehicle.getFuelType())
                 .imageUrl(vehicle.getImageUrl())
                 .active(vehicle.getActive())
                 .createdAt(vehicle.getCreatedAt())

@@ -39,3 +39,6 @@ databaseChangeLog:
   # ── Mechanic Preferences feature ─────────────────────────────────────────────
   - include:
       file: db/changelog/changes/020-create-user-mechanic-preferences-table.yaml
+  # ── Vehicle Catalogue Seed Data ───────────────────────────────────────────────
+  - include:
+      file: db/changelog/changes/021-seed-vehicle-catalogue.yaml

@@ -1,5 +1,6 @@
 package com.alvexo.bookingapp.dto.request;
 
+import com.alvexo.bookingapp.model.FuelType;
 import com.alvexo.bookingapp.model.VehicleType;
 
 import jakarta.validation.constraints.Max;
@@ -26,8 +27,11 @@ public class VehicleRequest {
     private Integer year;
     
     
-    @NotNull(message = "Vehicle type is required")
-    private VehicleType vehicleType;
-    
+//    @NotNull(message = "Vehicle type is required")
+//    private VehicleType vehicleType;
+
+    @NotNull(message = "Fuel type is required")
+    private FuelType fuelType;
+
     private String imageUrl;
 }
