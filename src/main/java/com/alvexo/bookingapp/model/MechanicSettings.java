@@ -1,7 +1,10 @@
 package com.alvexo.bookingapp.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -97,6 +100,52 @@ public class MechanicSettings {
     @Column(name = "preferences", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private String preferences;
+
+    /**
+     * Identifies which job card classification this mechanic uses.
+     * AUTO_JOB_CARD  = Type 1 or Type 2 (Auto Job Card A)
+     * MECHANIC_JOB_CARD = Type 3 or Type 4 (Mechanic Job Card B)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_card_type", nullable = false, length = 20)
+    @Builder.Default
+    private JobCardType jobCardType = JobCardType.AUTO_JOB_CARD;
+
+    /**
+     * Type 3 = false (no slot management).
+     * Type 4 = true  (dedicated repair slots enabled).
+     * Only relevant when jobCardType = MECHANIC_JOB_CARD.
+     */
+    @Column(name = "reserve_for_slots")
+    private Boolean reserveForSlots;
+
+    /**
+     * Whether Auto Allocation quota is active.
+     * true  = riders can self-book from AA hours.
+     * false = all bookings must be created by mechanic.
+     * Only relevant when jobCardType = MECHANIC_JOB_CARD.
+     */
+    @Column(name = "auto_allocation_enabled")
+    private Boolean autoAllocationEnabled;
+
+    /** Type - 4
+     * Whether Repair Auto Allocation quota is active.
+     * true  = riders can self-book from RAC hours.
+     * false = all bookings must be created by mechanic.
+     * Only relevant when jobCardType = MECHANIC_JOB_CARD.
+     */
+    @Column(name = "repair_auto_allocation_enabled")
+    private Boolean repairAutoAllocationEnabled;
+
+    /**
+     * Auto Allocation Capacity in hours (AA).
+     * Riders consume from this bucket only.
+     * Reserved Capacity (RC) = fullDayCapacityHours - autoAllocHours.
+     * RC is never stored — always computed at runtime.
+     * Range: 0 to fullDayCapacityHours.
+     */
+    @Column(name = "auto_allocation_hours", precision = 5, scale = 2)
+    private BigDecimal autoAllocationHours;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

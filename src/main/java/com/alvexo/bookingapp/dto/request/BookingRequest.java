@@ -1,13 +1,13 @@
 package com.alvexo.bookingapp.dto.request;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
+import com.alvexo.bookingapp.model.BookingType;
 import com.alvexo.bookingapp.model.ServiceType;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 public class BookingRequest {
@@ -25,6 +25,9 @@ public class BookingRequest {
     
     @NotBlank(message = "Description is required")
     private String description;
+
+    @NotNull(message = "Booking Type is required")
+    private BookingType bookingType;
 
     /**
      * FK → mechanic_service_settings.id

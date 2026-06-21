@@ -1,7 +1,10 @@
 package com.alvexo.bookingapp.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -42,6 +45,12 @@ public class MechanicServiceSetting {
      */
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
+
+    /**
+     * No of Vehicle for specific Service Name
+     */
+    @Column(name = "no_of_vehicle")
+    private Integer noOfVehicle;
 
     /**
      * Optional cap on how many times this specific service can be booked per day.

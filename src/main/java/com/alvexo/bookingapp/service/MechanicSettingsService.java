@@ -37,13 +37,8 @@ public class MechanicSettingsService {
         MechanicSettings settings = settingsRepository.findByMechanic(mechanic)
                 .orElse(MechanicSettings.builder().mechanic(mechanic).build());
 
-        applyRequest(settings, request);
+        applyRequest(settings, request, mechanic);
         settings = settingsRepository.save(settings);
-
-        // Replace service settings if provided
-        if (request.getServiceSettings() != null) {
-            replaceServiceSettings(mechanic, request.getServiceSettings());
-        }
 
         return buildResponse(settings);
     }
@@ -181,15 +176,56 @@ public class MechanicSettingsService {
         }
     }
 
-    private void applyRequest(MechanicSettings s, MechanicSettingsRequest r) {
-        s.setMaxVehiclesPerDay(r.getMaxVehiclesPerDay());
-        s.setReserveCapacity(r.getReserveCapacity());
-        s.setFullDayCapacityHours(r.getFullDayCapacityHours());
-        s.setJobCardSerialPrefix(r.getJobCardSerialPrefix());
-        s.setServiceReportingTime(r.getServiceReportingTime());
-        s.setExpressReportingTime(r.getExpressReportingTime());
-        s.setAdvanceEnabled(r.getAdvanceEnabled());
-        s.setAdvanceAmount(r.getAdvanceAmount());
+    private void applyRequest(MechanicSettings s, MechanicSettingsRequest r, User mechanic) {
+
+        // TYPE 1 :
+        if (r.getJobCardType().equals(JobCardType.AUTO_JOB_CARD) && r.getReserveCapacity().equals(Boolean.FALSE)) {
+            s.setMaxVehiclesPerDay(r.getMaxVehiclesPerDay());
+            s.setReserveCapacity(r.getReserveCapacity());
+            s.setJobCardSerialPrefix(r.getJobCardSerialPrefix());
+            s.setServiceReportingTime(r.getServiceReportingTime());
+            s.setAdvanceEnabled(r.getAdvanceEnabled());
+            s.setAdvanceAmount(r.getAdvanceAmount());
+        }
+        // TYPE 2 :
+        if (r.getJobCardType().equals(JobCardType.AUTO_JOB_CARD) && r.getReserveCapacity().equals(Boolean.TRUE)) {
+            s.setMaxVehiclesPerDay(r.getMaxVehiclesPerDay());
+            s.setReserveCapacity(r.getReserveCapacity());
+            s.setFullDayCapacityHours(r.getFullDayCapacityHours());
+            s.setJobCardSerialPrefix(r.getJobCardSerialPrefix());
+            s.setServiceReportingTime(r.getServiceReportingTime());
+            s.setExpressReportingTime(r.getExpressReportingTime());
+            s.setAdvanceEnabled(r.getAdvanceEnabled());
+            s.setAdvanceAmount(r.getAdvanceAmount());
+            // Replace service settings
+            if (r.getServiceSettings() != null) replaceServiceSettings(mechanic, r.getServiceSettings());
+        }
+        // TYPE 3 :
+        if (r.getJobCardType().equals(JobCardType.MECHANIC_JOB_CARD) && r.getReserveForSlots().equals(Boolean.FALSE)) {
+            s.setReserveForSlots(r.getReserveForSlots());
+            s.setFullDayCapacityHours(r.getFullDayCapacityHours());
+            s.setAutoAllocationHours(r.getAutoAllocationHours());
+            s.setAutoAllocationEnabled(r.getAutoAllocationEnabled());
+            s.setServiceReportingTime(r.getServiceReportingTime());
+            s.setAdvanceEnabled(r.getAdvanceEnabled());
+            s.setAdvanceAmount(r.getAdvanceAmount());
+            s.setJobCardSerialPrefix(r.getJobCardSerialPrefix());
+            // Replace service settings
+            if (r.getServiceSettings() != null) replaceServiceSettings(mechanic, r.getServiceSettings());
+        }
+        // TYPE 4 :
+        if (r.getJobCardType().equals(JobCardType.MECHANIC_JOB_CARD) && r.getReserveForSlots().equals(Boolean.TRUE)) {
+            s.setReserveForSlots(r.getReserveForSlots());
+            s.setRepairAutoAllocationEnabled(r.getRepairAutoAllocationEnabled());
+            s.setFullDayCapacityHours(r.getFullDayCapacityHours());
+            s.setAutoAllocationEnabled(r.getAutoAllocationEnabled());
+            s.setAutoAllocationHours(r.getAutoAllocationHours());
+            s.setServiceReportingTime(r.getServiceReportingTime());
+            s.setAdvanceEnabled(r.getAdvanceEnabled());
+            s.setAdvanceAmount(r.getAdvanceAmount());
+            s.setJobCardSerialPrefix(r.getJobCardSerialPrefix());
+            if (r.getServiceSettings() != null) replaceServiceSettings(mechanic, r.getServiceSettings());
+        }
     }
 
     private void replaceServiceSettings(User mechanic, List<MechanicServiceSettingRequest> requests) {
@@ -208,6 +244,7 @@ public class MechanicSettingsService {
                 .mechanic(mechanic)
                 .serviceName(r.getServiceName())
                 .durationMinutes(r.getDurationMinutes())
+                .noOfVehicle(r.getNoOfVehicle())
                 .maxSlotsPerDay(r.getMaxSlotsPerDay())
                 .isExpressEligible(r.getIsExpressEligible() != null ? r.getIsExpressEligible() : false)
                 .isActive(r.getIsActive() != null ? r.getIsActive() : true)

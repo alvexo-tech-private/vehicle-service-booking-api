@@ -1,39 +1,23 @@
 package com.alvexo.bookingapp.service;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
+import com.alvexo.bookingapp.dto.request.BookingRequest;
+import com.alvexo.bookingapp.dto.response.BookingResponse;
+import com.alvexo.bookingapp.exception.BadRequestException;
+import com.alvexo.bookingapp.exception.ResourceNotFoundException;
+import com.alvexo.bookingapp.model.*;
+import com.alvexo.bookingapp.repository.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.alvexo.bookingapp.dto.request.BookingRequest;
-import com.alvexo.bookingapp.dto.response.BookingResponse;
-import com.alvexo.bookingapp.exception.BadRequestException;
-import com.alvexo.bookingapp.exception.ResourceNotFoundException;
-import com.alvexo.bookingapp.model.Booking;
-import com.alvexo.bookingapp.model.BookingStatus;
-import com.alvexo.bookingapp.model.BookingType;
-import com.alvexo.bookingapp.model.DayOfWeek;
-import com.alvexo.bookingapp.model.MechanicAvailability;
-import com.alvexo.bookingapp.model.MechanicServiceSetting;
-import com.alvexo.bookingapp.model.MechanicSettings;
-import com.alvexo.bookingapp.model.NotificationType;
-import com.alvexo.bookingapp.model.User;
-import com.alvexo.bookingapp.model.UserRole;
-import com.alvexo.bookingapp.model.Vehicle;
-import com.alvexo.bookingapp.repository.BookingRepository;
-import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
-import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
-import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
-import com.alvexo.bookingapp.repository.UserRepository;
-import com.alvexo.bookingapp.repository.VehicleRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class BookingService {
@@ -127,7 +111,7 @@ public class BookingService {
         }
 
         // 7. Settings-aware capacity checks
-        BookingType bookingType = BookingType.STANDARD;
+        BookingType bookingType = BookingType.GENERAL;
         BigDecimal requiredAdvance = BigDecimal.ZERO;
 
         if (settingsOpt.isPresent()) {
@@ -175,7 +159,7 @@ public class BookingService {
                                 "Service '" + serviceSetting.getServiceName() +
                                 "' is not eligible for express booking");
                     }
-                    bookingType = BookingType.EXPRESS;
+                    bookingType = request.getBookingType();
                 }
 
             } else {

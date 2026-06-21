@@ -28,6 +28,46 @@ databaseChangeLog:
                     nullable: false
                     unique: true
 
+              # Job card classification — AUTO_JOB_CARD or MECHANIC_JOB_CARD
+              - column:
+                  name: job_card_type
+                  type: VARCHAR(20)
+                  defaultValue: AUTO_JOB_CARD
+                  constraints:
+                    nullable: false
+
+              # Type 3 = false, Type 4 = true. Null when job_card_type = AUTO_JOB_CARD.
+              - column:
+                  name: reserve_for_slots
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # true = riders can self-book from AA hours.
+              # Only relevant when job_card_type = MECHANIC_JOB_CARD.
+              - column:
+                  name: auto_allocation_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # true = riders can self-book from RAC hours (Type 4 only).
+              # Only relevant when job_card_type = MECHANIC_JOB_CARD.
+              - column:
+                  name: repair_auto_allocation_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # AA hours bucket. RC = full_day_capacity_hours - auto_allocation_hours (computed).
+              # Only relevant when job_card_type = MECHANIC_JOB_CARD.
+              - column:
+                  name: auto_allocation_hours
+                  type: DECIMAL(5,2)
+
               - column:
                   name: max_vehicles_per_day
                   type: INT
