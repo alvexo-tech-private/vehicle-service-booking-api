@@ -25,7 +25,7 @@ databaseChangeLog:
 
               - column:
                   name: password
-                  value: $2a$10$7QfDcMBFPMH3nHCpCg6hIuUmHAVKAMRr9P3UdVnRRKFSPsHg6Qdxm
+                  value: $2a$10$Q6NvNy6LN4pRafDeiLHbFezOw6Ipfy9gOZlLRSbvfA1RWfLM1u5I2
 
               - column:
                   name: role
