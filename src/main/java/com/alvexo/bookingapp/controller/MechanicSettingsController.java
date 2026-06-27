@@ -35,23 +35,45 @@ public class MechanicSettingsController {
         this.userRepository = userRepository;
     }
 
-    // ── Settings (upsert / get) ───────────────────────────────────────────────
+    // ── Settings (create / update / get) ─────────────────────────────────────
 
-    @Operation(summary = "Save mechanic settings (create or update)",
-               description = "Creates or fully replaces the mechanic's booking settings including job card type configuration.")
+    @Operation(summary = "Create mechanic settings",
+               description = "First-time setup of the mechanic's booking settings including job card type. "
+                           + "Fails if settings already exist — use PUT to update.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Settings saved"),
-        @ApiResponse(responseCode = "400", description = "Validation failed or business rule violated")
+        @ApiResponse(responseCode = "201", description = "Settings created"),
+        @ApiResponse(responseCode = "400", description = "Settings already exist or validation failed")
     })
-    @PutMapping
+    @PostMapping
     @PreAuthorize("hasRole('MECHANIC')")
-    public ResponseEntity<MyApiResponse<MechanicSettingsResponse>> saveSettings(
+    public ResponseEntity<MyApiResponse<MechanicSettingsResponse>> createSettings(
             @Valid @RequestBody MechanicSettingsRequest request,
             Authentication authentication) {
 
         User mechanic = resolveUser(authentication);
-        MechanicSettingsResponse response = settingsService.saveSettings(mechanic, request);
-        return ResponseEntity.ok(MyApiResponse.success("Settings saved successfully", response));
+        MechanicSettingsResponse response = settingsService.createSettings(mechanic, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(MyApiResponse.success("Settings created successfully", response));
+    }
+
+    @Operation(summary = "Update mechanic settings",
+               description = "Updates existing mechanic settings. Use this to change job card type "
+                           + "(e.g. TYPE_1 → TYPE_4), capacity config, reporting times, or advance payment. "
+                           + "Fails if settings don't exist yet — use POST to create first.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Settings updated"),
+        @ApiResponse(responseCode = "404", description = "Settings not found — create first"),
+        @ApiResponse(responseCode = "400", description = "Validation failed")
+    })
+    @PutMapping
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<MechanicSettingsResponse>> updateSettings(
+            @Valid @RequestBody MechanicSettingsRequest request,
+            Authentication authentication) {
+
+        User mechanic = resolveUser(authentication);
+        MechanicSettingsResponse response = settingsService.updateSettings(mechanic, request);
+        return ResponseEntity.ok(MyApiResponse.success("Settings updated successfully", response));
     }
 
     @Operation(summary = "Get my settings")

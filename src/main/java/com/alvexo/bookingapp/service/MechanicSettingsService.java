@@ -35,15 +35,36 @@ public class MechanicSettingsService {
         this.overrideRepository = overrideRepository;
     }
 
-    // ── Settings (upsert / get) ──────────────────────────────────────────────
+    // ── Settings (create / update / get) ────────────────────────────────────
 
     @Transactional
-    public MechanicSettingsResponse saveSettings(User mechanic, MechanicSettingsRequest request) {
+    public MechanicSettingsResponse createSettings(User mechanic, MechanicSettingsRequest request) {
+        validateRole(mechanic);
+        validateSettingsRequest(request);
+
+        if (settingsRepository.existsByMechanic(mechanic)) {
+            throw new BadRequestException("Settings already exist. Use PUT to update.");
+        }
+
+        MechanicSettings settings = MechanicSettings.builder().mechanic(mechanic).build();
+        applyRequest(settings, request);
+        settings = settingsRepository.save(settings);
+
+        if (request.getServiceSettings() != null) {
+            replaceServiceSettings(mechanic, request.getServiceSettings());
+        }
+
+        return buildResponse(settings);
+    }
+
+    @Transactional
+    public MechanicSettingsResponse updateSettings(User mechanic, MechanicSettingsRequest request) {
         validateRole(mechanic);
         validateSettingsRequest(request);
 
         MechanicSettings settings = settingsRepository.findByMechanic(mechanic)
-                .orElse(MechanicSettings.builder().mechanic(mechanic).build());
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Settings not found. Use POST to create first."));
 
         applyRequest(settings, request);
         settings = settingsRepository.save(settings);
