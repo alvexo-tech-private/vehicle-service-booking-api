@@ -1,0 +1,82 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-create-daily-quota-override-table
+      author: system
+      comment: >
+        Creates daily_quota_override table for one-day emergency capacity overrides.
+        Allows mechanics to temporarily extend capacity limits for high-demand days
+        (e.g. festival rush). One override per mechanic per date.
+      changes:
+        - createTable:
+            tableName: daily_quota_override
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_settings_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: override_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: override_max_vehicles
+                  type: INT
+
+              - column:
+                  name: override_capacity_hours
+                  type: DECIMAL(5,2)
+
+              - column:
+                  name: reason
+                  type: VARCHAR(255)
+
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: daily_quota_override
+            baseColumnNames: mechanic_settings_id
+            constraintName: fk_daily_override_settings
+            referencedTableName: mechanic_settings
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - addUniqueConstraint:
+            tableName: daily_quota_override
+            columnNames: mechanic_settings_id, override_date
+            constraintName: uq_daily_override_mechanic_date
+
+        - createIndex:
+            indexName: idx_daily_override_lookup
+            tableName: daily_quota_override
+            columns:
+              - column:
+                  name: mechanic_settings_id
+              - column:
+                  name: override_date
+
+      rollback:
+        - dropTable:
+            tableName: daily_quota_override

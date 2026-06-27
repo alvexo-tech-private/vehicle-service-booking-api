@@ -1,0 +1,132 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-create-mechanic-service-slots-table
+      author: system
+      comment: >
+        Creates mechanic_service_slots table for TYPE_4 job card configuration.
+        Category-agnostic time-windowed slots — any service category can be assigned
+        to any time window via restricted_category.
+        Each slot has its own auto/manual allocation split (auto_allocation_qty).
+        applicable_days allows day-specific scheduling (NULL = all days).
+        Also adds the FK from bookings.service_slot_id to this table.
+      changes:
+        - createTable:
+            tableName: mechanic_service_slots
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_settings_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: slot_number
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: start_time
+                  type: TIME
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: end_time
+                  type: TIME
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: restricted_category
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: max_vehicle_qty
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: auto_allocation_qty
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+              # Comma-separated weekdays: "MON,WED,FRI". NULL = all days.
+              - column:
+                  name: applicable_days
+                  type: VARCHAR(27)
+
+              - column:
+                  name: is_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_service_slots
+            baseColumnNames: mechanic_settings_id
+            constraintName: fk_service_slots_settings
+            referencedTableName: mechanic_settings
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_service_slots_settings
+            tableName: mechanic_service_slots
+            columns:
+              - column:
+                  name: mechanic_settings_id
+
+        - createIndex:
+            indexName: idx_service_slots_category
+            tableName: mechanic_service_slots
+            columns:
+              - column:
+                  name: mechanic_settings_id
+              - column:
+                  name: restricted_category
+
+        # FK from bookings.service_slot_id → mechanic_service_slots.id
+        # Added here (not in 019) because this table must exist first.
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: service_slot_id
+            constraintName: fk_bookings_service_slot
+            referencedTableName: mechanic_service_slots
+            referencedColumnNames: id
+            onDelete: RESTRICT
+            onUpdate: CASCADE
+
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_service_slot
+        - dropTable:
+            tableName: mechanic_service_slots

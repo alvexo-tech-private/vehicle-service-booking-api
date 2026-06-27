@@ -44,3 +44,12 @@ databaseChangeLog:
           file: db/changelog/changes/021-seed-system-admin-user.yaml
   - include:
           file: db/changelog/changes/022-seed-vehicle-catalogue.yaml
+  # ── Job Card Type System ──────────────────────────────────────────────────────
+  - include:
+      file: db/changelog/changes/023-create-mechanic-service-slots-table.yaml
+  - include:
+      file: db/changelog/changes/024-create-mechanic-technician-capacity-table.yaml
+  - include:
+      file: db/changelog/changes/025-create-daily-quota-override-table.yaml
+  - include:
+      file: db/changelog/changes/026-create-job-card-sequence-table.yaml

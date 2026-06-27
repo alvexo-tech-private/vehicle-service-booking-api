@@ -14,26 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alvexo.bookingapp.dto.request.BookingRequest;
+import com.alvexo.bookingapp.dto.request.MechanicCreatedBookingRequest;
 import com.alvexo.bookingapp.dto.response.BookingResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
-import com.alvexo.bookingapp.model.Booking;
-import com.alvexo.bookingapp.model.BookingStatus;
-import com.alvexo.bookingapp.model.BookingType;
-import com.alvexo.bookingapp.model.DayOfWeek;
-import com.alvexo.bookingapp.model.MechanicAvailability;
-import com.alvexo.bookingapp.model.MechanicServiceSetting;
-import com.alvexo.bookingapp.model.MechanicSettings;
-import com.alvexo.bookingapp.model.NotificationType;
-import com.alvexo.bookingapp.model.User;
-import com.alvexo.bookingapp.model.UserRole;
-import com.alvexo.bookingapp.model.Vehicle;
-import com.alvexo.bookingapp.repository.BookingRepository;
-import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
-import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
-import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
-import com.alvexo.bookingapp.repository.UserRepository;
-import com.alvexo.bookingapp.repository.VehicleRepository;
+import com.alvexo.bookingapp.model.*;
+import com.alvexo.bookingapp.repository.*;
 
 @Service
 public class BookingService {
@@ -44,7 +30,10 @@ public class BookingService {
     private final MechanicAvailabilityRepository availabilityRepository;
     private final MechanicSettingsRepository mechanicSettingsRepository;
     private final MechanicServiceSettingRepository serviceSettingRepository;
+    private final MechanicServiceSlotRepository slotRepository;
+    private final JobCardSequenceRepository jobCardSequenceRepository;
     private final NotificationService notificationService;
+    private final MechanicSettingsService mechanicSettingsService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -53,208 +42,145 @@ public class BookingService {
             MechanicAvailabilityRepository availabilityRepository,
             MechanicSettingsRepository mechanicSettingsRepository,
             MechanicServiceSettingRepository serviceSettingRepository,
-            NotificationService notificationService) {
+            MechanicServiceSlotRepository slotRepository,
+            JobCardSequenceRepository jobCardSequenceRepository,
+            NotificationService notificationService,
+            MechanicSettingsService mechanicSettingsService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
         this.availabilityRepository = availabilityRepository;
         this.mechanicSettingsRepository = mechanicSettingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
+        this.slotRepository = slotRepository;
+        this.jobCardSequenceRepository = jobCardSequenceRepository;
         this.notificationService = notificationService;
+        this.mechanicSettingsService = mechanicSettingsService;
     }
 
-    /**
-     * Creates a booking with full concurrency protection.
-     *
-     * Capacity strategy — driven by mechanic's reserveCapacity setting:
-     *
-     * ── Vehicle-count mode (reserveCapacity = false) ──────────────────────────
-     *   Counts active (non-cancelled) bookings for the day.
-     *   Rejects if count >= maxVehiclesPerDay.
-     *
-     * ── Hour-slot mode (reserveCapacity = true) ───────────────────────────────
-     *   Sums duration_minutes of all active bookings for the day.
-     *   Rejects if (sum + newServiceDuration) > fullDayCapacityHours * 60.
-     *   Also checks per-service cap (maxSlotsPerDay) when set.
-     *   Determines bookingType (STANDARD / EXPRESS) from scheduled time
-     *   vs mechanic's expressReportingTime.
-     *
-     * Advance payment:
-     *   If mechanic.advanceEnabled = true, request.advancePaid must equal
-     *   mechanic.advanceAmount for the booking to be accepted.
-     *
-     * Concurrency layers:
-     *   Layer 1 (application): PESSIMISTIC_WRITE lock on conflicting bookings.
-     *   Layer 2 (database):    unique constraint on (mechanic_id, scheduled_date_time).
-     */
+    // ── Rider booking (POST /api/bookings) ───────────────────────────────────
+
     @Transactional
     public BookingResponse createBooking(BookingRequest request, User vehicleUser) {
 
-        // 1. Validate mechanic
         User mechanic = userRepository.findById(request.getMechanicId())
                 .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found"));
         if (mechanic.getRole() != UserRole.MECHANIC) {
             throw new BadRequestException("Selected user is not a mechanic");
         }
 
-        // 2. Validate vehicle
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
 
-        // 3. Reject past-dated bookings
         if (request.getScheduledDateTime().isBefore(LocalDateTime.now())) {
             throw new BadRequestException("Bookings cannot be made for past dates");
         }
 
-        // 4. Validate slot within mechanic's availability template
         validateSlotWithinAvailability(mechanic, request.getScheduledDateTime());
 
-        // 5. Load mechanic settings (optional — some mechanics may not have configured yet)
-        Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(mechanic);
+        MechanicSettings settings = mechanicSettingsRepository.findByMechanic(mechanic)
+                .orElse(null);
+
         LocalDate bookingDate = request.getScheduledDateTime().toLocalDate();
 
-        // 6. Resolve service setting (if provided)
-        MechanicServiceSetting serviceSetting = null;
-        if (request.getServiceSettingId() != null) {
-            serviceSetting = serviceSettingRepository.findById(request.getServiceSettingId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Service setting not found"));
-            if (!serviceSetting.getMechanic().getId().equals(mechanic.getId())) {
-                throw new BadRequestException("Service does not belong to the selected mechanic");
-            }
-            if (!Boolean.TRUE.equals(serviceSetting.getIsActive())) {
-                throw new BadRequestException("Selected service is no longer available");
-            }
-        }
+        MechanicServiceSetting serviceSetting = resolveServiceSetting(request.getServiceSettingId(), mechanic);
 
-        // 7. Settings-aware capacity checks
-        BookingType bookingType = BookingType.STANDARD;
-        BigDecimal requiredAdvance = BigDecimal.ZERO;
-
-        if (settingsOpt.isPresent()) {
-            MechanicSettings settings = settingsOpt.get();
-
-            if (Boolean.TRUE.equals(settings.getReserveCapacity())) {
-                // ── Hour-slot mode ────────────────────────────────────────────
-                if (serviceSetting == null) {
-                    throw new BadRequestException(
-                            "serviceSettingId is required for this mechanic (hour-slot mode)");
-                }
-
-                int durationMinutes = serviceSetting.getDurationMinutes();
-
-                // Check global hour capacity
-                int bookedMinutes = serviceSettingRepository
-                        .sumBookedMinutesForDate(mechanic.getId(), bookingDate);
-                int capacityMinutes = settings.getFullDayCapacityHours()
-                        .multiply(BigDecimal.valueOf(60)).intValue();
-
-                if ((bookedMinutes + durationMinutes) > capacityMinutes) {
-                    throw new BadRequestException(
-                            "Mechanic's daily capacity is full for " + bookingDate +
-                            ". Available: " + (capacityMinutes - bookedMinutes) + " min.");
-                }
-
-                // Check per-service cap
-                if (serviceSetting.getMaxSlotsPerDay() != null) {
-                    int serviceCount = serviceSettingRepository
-                            .countBookingsForServiceOnDate(serviceSetting.getId(), bookingDate);
-                    if (serviceCount >= serviceSetting.getMaxSlotsPerDay()) {
-                        throw new BadRequestException(
-                                "No more slots available for service '" +
-                                serviceSetting.getServiceName() + "' on " + bookingDate);
-                    }
-                }
-
-                // Determine booking type
-                if (settings.getExpressReportingTime() != null &&
-                    request.getScheduledDateTime().toLocalTime()
-                           .isBefore(settings.getExpressReportingTime())) {
-
-                    if (!Boolean.TRUE.equals(serviceSetting.getIsExpressEligible())) {
-                        throw new BadRequestException(
-                                "Service '" + serviceSetting.getServiceName() +
-                                "' is not eligible for express booking");
-                    }
-                    bookingType = BookingType.EXPRESS;
-                }
-
-            } else {
-                // ── Vehicle-count mode ────────────────────────────────────────
-                long activeCount = bookingRepository.countActiveBookingsForMechanicOnDate(
-                        mechanic, bookingDate);
-                if (activeCount >= settings.getMaxVehiclesPerDay()) {
-                    throw new BadRequestException(
-                            "Mechanic has reached the maximum vehicle limit (" +
-                            settings.getMaxVehiclesPerDay() + ") for " + bookingDate);
-                }
-            }
-
-            // Advance payment check
-            if (Boolean.TRUE.equals(settings.getAdvanceEnabled()) &&
-                settings.getAdvanceAmount() != null) {
-                requiredAdvance = settings.getAdvanceAmount();
-                BigDecimal paidAdvance = request.getAdvancePaid() != null
-                        ? request.getAdvancePaid() : BigDecimal.ZERO;
-                if (paidAdvance.compareTo(requiredAdvance) < 0) {
-                    throw new BadRequestException(
-                            "Advance payment of INR " + requiredAdvance +
-                            " is required to confirm this booking");
-                }
-            }
-        }
-
-        // 8. PESSIMISTIC LOCK — concurrency layer 1
+        // Concurrency layer 1: pessimistic lock
         List<Booking> conflicts = bookingRepository.findAndLockConflicting(
                 mechanic, request.getScheduledDateTime());
         if (!conflicts.isEmpty()) {
-            throw new BadRequestException(
-                    "This slot is already booked. Please choose a different time.");
+            throw new BadRequestException("This slot is already booked. Please choose a different time.");
         }
 
-        // 9. Build and save — DB unique constraint is the final guard
-        Booking booking = Booking.builder()
-                .vehicleUser(vehicleUser)
-                .mechanic(mechanic)
-                .vehicle(vehicle)
-                .serviceSetting(serviceSetting)
-                .bookingNumber(generateBookingNumber())
-                .scheduledDateTime(request.getScheduledDateTime())
-                .status(BookingStatus.PENDING)
-                .bookingType(bookingType)
-                .serviceType(request.getServiceType())
-                .description(request.getDescription())
-                .estimatedCost(request.getEstimatedCost())
-                .estimatedDurationMinutes(
-                        serviceSetting != null
-                        ? serviceSetting.getDurationMinutes()
-                        : request.getEstimatedDurationMinutes())
-                .advancePaid(request.getAdvancePaid() != null
-                        ? request.getAdvancePaid() : BigDecimal.ZERO)
-                .customerNotes(request.getCustomerNotes())
-                .build();
+        // Determine booking type (express vs standard)
+        BookingType bookingType = resolveBookingType(settings, serviceSetting, request.getScheduledDateTime());
 
-        try {
-            booking = bookingRepository.save(booking);
-        } catch (DataIntegrityViolationException e) {
-            if (e.getMessage() != null && e.getMessage().contains("uq_mechanic_slot")) {
-                throw new BadRequestException(
-                        "This slot was just taken by another booking. Please choose a different time.");
-            }
-            throw e;
+        // Advance payment check
+        validateAdvancePayment(settings, request.getAdvancePaid());
+
+        // Build base booking
+        Booking booking = buildBaseBooking(vehicleUser, mechanic, vehicle, serviceSetting,
+                request, bookingType);
+        booking.setBookingSource(BookingSource.RIDER_APP);
+
+        // Branch by job card type
+        if (settings == null) {
+            booking.setStatus(BookingStatus.PENDING);
+        } else {
+            applyJobCardTypeLogic(booking, settings, serviceSetting, bookingDate);
         }
 
-        // 10. Notify mechanic
+        booking = saveBookingWithConflictGuard(booking);
+
         notificationService.createNotification(
-                mechanic,
-                "New Booking Request",
-                "You have a new " + bookingType.name().toLowerCase() +
-                " booking request from " + vehicleUser.getFirstName(),
-                NotificationType.BOOKING_CREATED,
-                "Booking",
-                booking.getId());
+                mechanic, "New Booking Request",
+                "You have a new booking request from " + vehicleUser.getFirstName(),
+                NotificationType.BOOKING_CREATED, "Booking", booking.getId());
 
         return convertToResponse(booking);
     }
+
+    // ── Walk-in booking (POST /api/bookings/walk-in) ─────────────────────────
+
+    @Transactional
+    public BookingResponse createWalkInBooking(MechanicCreatedBookingRequest request, User mechanic) {
+        if (mechanic.getRole() != UserRole.MECHANIC) {
+            throw new BadRequestException("Only mechanics can create walk-in bookings");
+        }
+
+        MechanicSettings settings = mechanicSettingsRepository.findByMechanic(mechanic)
+                .orElseThrow(() -> new ResourceNotFoundException("Settings not configured"));
+
+        if (settings.getJobCardType() != JobCardType.TYPE_3 && settings.getJobCardType() != JobCardType.TYPE_4) {
+            throw new BadRequestException("Walk-in bookings are only available for TYPE_3 and TYPE_4 mechanics");
+        }
+
+        LocalDate bookingDate = request.getScheduledDateTime().toLocalDate();
+
+        MechanicServiceSetting serviceSetting = resolveServiceSetting(
+                request.getServiceSettingId(), mechanic);
+
+        // Global capacity check
+        BigDecimal effectiveCapacity = mechanicSettingsService.getEffectiveCapacityHours(settings, bookingDate);
+        long totalMinutes = bookingRepository.sumAllBookedMinutesForDate(mechanic.getId(), bookingDate);
+        int duration = serviceSetting != null ? serviceSetting.getDurationMinutes() : 60;
+
+        if (effectiveCapacity != null && (totalMinutes + duration) > effectiveCapacity.multiply(BigDecimal.valueOf(60)).longValue()) {
+            throw new BadRequestException("Quota Limit Exceeded — daily capacity is full for " + bookingDate);
+        }
+
+        // Link to existing user if mobile matches
+        User linkedUser = null;
+        if (request.getCustomerMobile() != null) {
+            linkedUser = userRepository.findByMobileNumber(request.getCustomerMobile()).orElse(null);
+        }
+
+        Booking booking = Booking.builder()
+                .vehicleUser(linkedUser)
+                .mechanic(mechanic)
+                .bookingNumber(generateBookingNumber())
+                .scheduledDateTime(request.getScheduledDateTime())
+                .status(BookingStatus.CONFIRMED)
+                .bookingType(BookingType.STANDARD)
+                .serviceType(ServiceType.MAINTENANCE)
+                .description(request.getDescription())
+                .serviceSetting(serviceSetting)
+                .estimatedDurationMinutes(duration)
+                .bookingSource(BookingSource.WALK_IN)
+                .allocationResult(AllocationResult.AUTO_CONFIRMED)
+                .walkInCustomerName(request.getCustomerName())
+                .walkInCustomerMobile(request.getCustomerMobile())
+                .walkInVehicleDescription(request.getVehicleDescription())
+                .customerNotes(request.getCustomerNotes())
+                .build();
+
+        booking.setJobCardNumber(generateJobCardNumber(settings, bookingDate));
+        booking = bookingRepository.save(booking);
+
+        return convertToResponse(booking);
+    }
+
+    // ── Status update ────────────────────────────────────────────────────────
 
     @Transactional
     public BookingResponse updateBookingStatus(Long bookingId, BookingStatus newStatus, User user) {
@@ -267,9 +193,13 @@ public class BookingService {
             }
         }
 
-        // On confirmation, generate job card number if not already set
         if (newStatus == BookingStatus.CONFIRMED && booking.getJobCardNumber() == null) {
-            booking.setJobCardNumber(generateJobCardNumber(booking));
+            MechanicSettings settings = mechanicSettingsRepository.findByMechanic(booking.getMechanic())
+                    .orElse(null);
+            if (settings != null) {
+                booking.setJobCardNumber(generateJobCardNumber(settings,
+                        booking.getScheduledDateTime().toLocalDate()));
+            }
         }
 
         booking.setStatus(newStatus);
@@ -293,16 +223,18 @@ public class BookingService {
         User recipient = booking.getMechanic().getId().equals(user.getId())
                 ? booking.getVehicleUser() : booking.getMechanic();
 
-        notificationService.createNotification(
-                recipient,
-                "Booking Status Updated",
-                "Booking #" + booking.getBookingNumber() + " status: " + newStatus,
-                NotificationType.valueOf("BOOKING_" + newStatus),
-                "Booking",
-                booking.getId());
+        if (recipient != null) {
+            notificationService.createNotification(
+                    recipient, "Booking Status Updated",
+                    "Booking #" + booking.getBookingNumber() + " status: " + newStatus,
+                    NotificationType.valueOf("BOOKING_" + newStatus),
+                    "Booking", booking.getId());
+        }
 
         return convertToResponse(booking);
     }
+
+    // ── Read ─────────────────────────────────────────────────────────────────
 
     public Page<BookingResponse> getUserBookings(User user, Pageable pageable) {
         if (user.getRole() == UserRole.MECHANIC) {
@@ -315,16 +247,302 @@ public class BookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (!booking.getVehicleUser().getId().equals(user.getId())
-                && !booking.getMechanic().getId().equals(user.getId())
-                && user.getRole() != UserRole.ADMINISTRATOR) {
+        boolean isOwner = (booking.getVehicleUser() != null && booking.getVehicleUser().getId().equals(user.getId()))
+                || booking.getMechanic().getId().equals(user.getId())
+                || user.getRole() == UserRole.ADMINISTRATOR;
+
+        if (!isOwner) {
             throw new BadRequestException("You don't have access to this booking");
         }
 
         return convertToResponse(booking);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // ── Job card type logic ──────────────────────────────────────────────────
+
+    private void applyJobCardTypeLogic(Booking booking, MechanicSettings settings,
+                                        MechanicServiceSetting serviceSetting,
+                                        LocalDate bookingDate) {
+        switch (settings.getJobCardType()) {
+            case TYPE_1 -> applyType1(booking, settings, bookingDate);
+            case TYPE_2 -> applyType2(booking, settings, serviceSetting, bookingDate);
+            case TYPE_3 -> applyType3(booking, settings, serviceSetting, bookingDate);
+            case TYPE_4 -> applyType4(booking, settings, serviceSetting, bookingDate);
+        }
+    }
+
+    private void applyType1(Booking booking, MechanicSettings settings, LocalDate bookingDate) {
+        Integer effectiveMax = mechanicSettingsService.getEffectiveMaxVehicles(settings, bookingDate);
+        long bookedCount = bookingRepository.countActiveBookingsForMechanicOnDate(
+                booking.getMechanic(), bookingDate);
+
+        if (bookedCount >= effectiveMax) {
+            throw new BadRequestException("Daily booking limit reached (" + effectiveMax + " vehicles)");
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setAllocationResult(AllocationResult.AUTO_CONFIRMED);
+        booking.setJobCardNumber(generateJobCardNumber(settings, bookingDate));
+    }
+
+    private void applyType2(Booking booking, MechanicSettings settings,
+                             MechanicServiceSetting serviceSetting, LocalDate bookingDate) {
+        if (serviceSetting == null) {
+            throw new BadRequestException("serviceSettingId is required for TYPE_2 mechanics");
+        }
+
+        // Per-service cap
+        if (serviceSetting.getMaxSlotsPerDay() != null) {
+            long serviceCount = bookingRepository.countBookingsForServiceOnDate(
+                    serviceSetting.getId(), bookingDate);
+            if (serviceCount >= serviceSetting.getMaxSlotsPerDay()) {
+                throw new BadRequestException("Service '" + serviceSetting.getServiceName()
+                        + "' is unavailable for this date");
+            }
+        }
+
+        // Overall hour cap
+        if (settings.getTotalDailyCapacityHours() != null) {
+            long totalMinutes = bookingRepository.sumAllBookedMinutesForDate(
+                    booking.getMechanic().getId(), bookingDate);
+            long capMinutes = settings.getTotalDailyCapacityHours()
+                    .multiply(BigDecimal.valueOf(60)).longValue();
+            if ((totalMinutes + serviceSetting.getDurationMinutes()) > capMinutes) {
+                throw new BadRequestException("Daily capacity exceeded for " + bookingDate);
+            }
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setAllocationResult(AllocationResult.AUTO_CONFIRMED);
+        booking.setJobCardNumber(generateJobCardNumber(settings, bookingDate));
+    }
+
+    private void applyType3(Booking booking, MechanicSettings settings,
+                             MechanicServiceSetting serviceSetting, LocalDate bookingDate) {
+        if (serviceSetting == null) {
+            throw new BadRequestException("serviceSettingId is required for TYPE_3 mechanics");
+        }
+
+        BigDecimal effectiveCapacity = mechanicSettingsService.getEffectiveCapacityHours(settings, bookingDate);
+        int duration = serviceSetting.getDurationMinutes();
+        Long mechanicId = booking.getMechanic().getId();
+
+        // Global safeguard
+        long totalMinutes = bookingRepository.sumAllBookedMinutesForDate(mechanicId, bookingDate);
+        if (effectiveCapacity != null && (totalMinutes + duration) > effectiveCapacity.multiply(BigDecimal.valueOf(60)).longValue()) {
+            throw new BadRequestException("Quota Limit Exceeded — daily capacity is full");
+        }
+
+        // Auto-allocation check
+        if (Boolean.TRUE.equals(settings.getAutoAllocationEnabled())
+                && settings.getAutoAllocationCapacityHours() != null) {
+
+            long autoMinutes = bookingRepository.sumBookedMinutesByAllocationResult(
+                    mechanicId, bookingDate, AllocationResult.AUTO_CONFIRMED);
+            long autoCapMinutes = settings.getAutoAllocationCapacityHours()
+                    .multiply(BigDecimal.valueOf(60)).longValue();
+
+            if ((autoMinutes + duration) <= autoCapMinutes) {
+                booking.setStatus(BookingStatus.CONFIRMED);
+                booking.setAllocationResult(AllocationResult.AUTO_CONFIRMED);
+                booking.setJobCardNumber(generateJobCardNumber(settings, bookingDate));
+            } else {
+                booking.setStatus(BookingStatus.PENDING);
+                booking.setAllocationResult(AllocationResult.MANUAL_REVIEW);
+            }
+        } else {
+            booking.setStatus(BookingStatus.PENDING);
+            booking.setAllocationResult(AllocationResult.MANUAL_REVIEW);
+        }
+    }
+
+    private void applyType4(Booking booking, MechanicSettings settings,
+                             MechanicServiceSetting serviceSetting, LocalDate bookingDate) {
+        if (serviceSetting == null) {
+            throw new BadRequestException("serviceSettingId is required for TYPE_4 mechanics");
+        }
+
+        Long mechanicId = booking.getMechanic().getId();
+        int duration = serviceSetting.getDurationMinutes();
+
+        // Check if service category matches a restricted slot
+        List<MechanicServiceSlot> matchingSlots = slotRepository
+                .findByMechanicSettingsAndRestrictedCategoryAndIsEnabledTrue(
+                        settings, serviceSetting.getCategory());
+
+        // Filter by applicable day
+        java.time.DayOfWeek dayOfWeek = bookingDate.getDayOfWeek();
+        MechanicServiceSlot targetSlot = matchingSlots.stream()
+                .filter(s -> s.isApplicableOn(dayOfWeek))
+                .findFirst().orElse(null);
+
+        if (targetSlot != null) {
+            // ── SLOT BOOKING PATH ────────────────────────────────────────
+            long slotBookedCount = bookingRepository.countSlotBookingsForDate(
+                    targetSlot.getId(), bookingDate);
+
+            if (slotBookedCount >= targetSlot.getMaxVehicleQty()) {
+                throw new BadRequestException("Slot capacity full for "
+                        + targetSlot.getRestrictedCategory() + " on " + bookingDate);
+            }
+
+            booking.setServiceSlot(targetSlot);
+
+            long autoCount = bookingRepository.countAutoConfirmedSlotBookingsForDate(
+                    targetSlot.getId(), bookingDate);
+
+            if (autoCount < targetSlot.getAutoAllocationQty()) {
+                booking.setStatus(BookingStatus.CONFIRMED);
+                booking.setAllocationResult(AllocationResult.AUTO_CONFIRMED);
+                booking.setJobCardNumber(generateJobCardNumber(settings, bookingDate));
+            } else {
+                booking.setStatus(BookingStatus.PENDING);
+                booking.setAllocationResult(AllocationResult.MANUAL_REVIEW);
+            }
+        } else {
+            // ── GENERAL BOOKING PATH (TYPE_3 with slot deduction) ────────
+            BigDecimal effectiveCapacity = mechanicSettingsService.getEffectiveCapacityHours(settings, bookingDate);
+            long slotConsumedMinutes = bookingRepository.sumSlotConsumedMinutesForDate(mechanicId, bookingDate);
+
+            long availableGeneralMinutes = effectiveCapacity != null
+                    ? effectiveCapacity.multiply(BigDecimal.valueOf(60)).longValue() - slotConsumedMinutes
+                    : Long.MAX_VALUE;
+
+            long totalGeneralMinutes = bookingRepository.sumAllBookedMinutesForDate(mechanicId, bookingDate)
+                    - slotConsumedMinutes;
+
+            if ((totalGeneralMinutes + duration) > availableGeneralMinutes) {
+                throw new BadRequestException("Quota Limit Exceeded — general capacity is full");
+            }
+
+            // Auto-allocation within general pool
+            if (Boolean.TRUE.equals(settings.getAutoAllocationEnabled())
+                    && settings.getAutoAllocationCapacityHours() != null) {
+
+                long autoMinutes = bookingRepository.sumBookedMinutesByAllocationResult(
+                        mechanicId, bookingDate, AllocationResult.AUTO_CONFIRMED);
+                long autoCapMinutes = settings.getAutoAllocationCapacityHours()
+                        .multiply(BigDecimal.valueOf(60)).longValue();
+
+                if ((autoMinutes + duration) <= autoCapMinutes) {
+                    booking.setStatus(BookingStatus.CONFIRMED);
+                    booking.setAllocationResult(AllocationResult.AUTO_CONFIRMED);
+                    booking.setJobCardNumber(generateJobCardNumber(settings, bookingDate));
+                } else {
+                    booking.setStatus(BookingStatus.PENDING);
+                    booking.setAllocationResult(AllocationResult.MANUAL_REVIEW);
+                }
+            } else {
+                booking.setStatus(BookingStatus.PENDING);
+                booking.setAllocationResult(AllocationResult.MANUAL_REVIEW);
+            }
+        }
+    }
+
+    // ── Job card number generation (concurrency-safe) ────────────────────────
+
+    private String generateJobCardNumber(MechanicSettings settings, LocalDate date) {
+        String prefix = settings.getJobCardSerialPrefix();
+        String datePart = String.format("%02d%02d%02d",
+                date.getYear() % 100, date.getMonthValue(), date.getDayOfMonth());
+
+        Optional<JobCardSequence> seqOpt = jobCardSequenceRepository
+                .findAndLockByMechanicSettingsAndDate(settings, date);
+
+        JobCardSequence seq;
+        if (seqOpt.isPresent()) {
+            seq = seqOpt.get();
+            seq.setLastSequence(seq.getLastSequence() + 1);
+        } else {
+            seq = JobCardSequence.builder()
+                    .mechanicSettings(settings)
+                    .sequenceDate(date)
+                    .lastSequence(1)
+                    .build();
+        }
+        jobCardSequenceRepository.save(seq);
+
+        return prefix + datePart + String.format("%02d", seq.getLastSequence());
+    }
+
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    private MechanicServiceSetting resolveServiceSetting(Long serviceSettingId, User mechanic) {
+        if (serviceSettingId == null) return null;
+
+        MechanicServiceSetting setting = serviceSettingRepository.findById(serviceSettingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Service setting not found"));
+        if (!setting.getMechanic().getId().equals(mechanic.getId())) {
+            throw new BadRequestException("Service does not belong to the selected mechanic");
+        }
+        if (!Boolean.TRUE.equals(setting.getIsActive())) {
+            throw new BadRequestException("Selected service is no longer available");
+        }
+        return setting;
+    }
+
+    private BookingType resolveBookingType(MechanicSettings settings,
+                                           MechanicServiceSetting serviceSetting,
+                                           LocalDateTime scheduledDateTime) {
+        if (settings != null
+                && Boolean.TRUE.equals(settings.getReserveCapacity())
+                && settings.getExpressReportingTime() != null
+                && scheduledDateTime.toLocalTime().isBefore(settings.getExpressReportingTime())) {
+
+            if (serviceSetting != null && !Boolean.TRUE.equals(serviceSetting.getIsExpressEligible())) {
+                throw new BadRequestException("Service '" + serviceSetting.getServiceName()
+                        + "' is not eligible for express booking");
+            }
+            return BookingType.EXPRESS;
+        }
+        return BookingType.STANDARD;
+    }
+
+    private void validateAdvancePayment(MechanicSettings settings, BigDecimal advancePaid) {
+        if (settings != null && Boolean.TRUE.equals(settings.getAdvanceEnabled())
+                && settings.getAdvanceAmount() != null) {
+            BigDecimal paid = advancePaid != null ? advancePaid : BigDecimal.ZERO;
+            if (paid.compareTo(settings.getAdvanceAmount()) < 0) {
+                throw new BadRequestException("Advance payment of INR "
+                        + settings.getAdvanceAmount() + " is required");
+            }
+        }
+    }
+
+    private Booking buildBaseBooking(User vehicleUser, User mechanic, Vehicle vehicle,
+                                      MechanicServiceSetting serviceSetting,
+                                      BookingRequest request, BookingType bookingType) {
+        return Booking.builder()
+                .vehicleUser(vehicleUser)
+                .mechanic(mechanic)
+                .vehicle(vehicle)
+                .serviceSetting(serviceSetting)
+                .bookingNumber(generateBookingNumber())
+                .scheduledDateTime(request.getScheduledDateTime())
+                .bookingType(bookingType)
+                .serviceType(request.getServiceType())
+                .description(request.getDescription())
+                .estimatedCost(request.getEstimatedCost())
+                .estimatedDurationMinutes(serviceSetting != null
+                        ? serviceSetting.getDurationMinutes()
+                        : request.getEstimatedDurationMinutes())
+                .advancePaid(request.getAdvancePaid() != null
+                        ? request.getAdvancePaid() : BigDecimal.ZERO)
+                .customerNotes(request.getCustomerNotes())
+                .build();
+    }
+
+    private Booking saveBookingWithConflictGuard(Booking booking) {
+        try {
+            return bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException e) {
+            if (e.getMessage() != null && e.getMessage().contains("uq_mechanic_slot")) {
+                throw new BadRequestException(
+                        "This slot was just taken by another booking. Please choose a different time.");
+            }
+            throw e;
+        }
+    }
 
     private void validateSlotWithinAvailability(User mechanic, LocalDateTime scheduledDateTime) {
         DayOfWeek dayOfWeek = DayOfWeek.valueOf(scheduledDateTime.getDayOfWeek().name());
@@ -350,45 +568,14 @@ public class BookingService {
         }
     }
 
-    /**
-     * Generates job card number on booking confirmation.
-     * Format: {prefix}{YYMMDD}{2-digit daily sequence}
-     * e.g. prefix="0101", date=2025-04-08, seq=1 → "010125040801"
-     */
-    private String generateJobCardNumber(Booking booking) {
-        Optional<MechanicSettings> settingsOpt =
-                mechanicSettingsRepository.findByMechanic(booking.getMechanic());
-
-        String prefix = settingsOpt.map(MechanicSettings::getJobCardSerialPrefix).orElse("JC");
-        LocalDate date = booking.getScheduledDateTime().toLocalDate();
-        String datePart = String.format("%02d%02d%02d",
-                date.getYear() % 100, date.getMonthValue(), date.getDayOfMonth());
-
-        long dailySeq = bookingRepository.countByMechanicAndJobCardNumberStartingWith(
-                booking.getMechanic(), prefix + datePart) + 1;
-
-        return prefix + datePart + String.format("%02d", dailySeq);
-    }
-
     private BookingResponse convertToResponse(Booking booking) {
-        return BookingResponse.builder()
+        BookingResponse.BookingResponseBuilder builder = BookingResponse.builder()
                 .id(booking.getId())
                 .bookingNumber(booking.getBookingNumber())
                 .jobCardNumber(booking.getJobCardNumber())
-                .vehicleUserId(booking.getVehicleUser().getId())
-                .vehicleUserName(booking.getVehicleUser().getFirstName() + " " +
-                                 booking.getVehicleUser().getLastName())
                 .mechanicId(booking.getMechanic().getId())
                 .mechanicName(booking.getMechanic().getFirstName() + " " +
                               booking.getMechanic().getLastName())
-                .vehicleId(booking.getVehicle().getId())
-                .vehicleInfo(booking.getVehicle().getMake() + " " +
-                             booking.getVehicle().getModel() + " " +
-                             booking.getVehicle().getYear())
-                .serviceSettingId(booking.getServiceSetting() != null
-                        ? booking.getServiceSetting().getId() : null)
-                .serviceSettingName(booking.getServiceSetting() != null
-                        ? booking.getServiceSetting().getServiceName() : null)
                 .scheduledDateTime(booking.getScheduledDateTime())
                 .status(booking.getStatus())
                 .bookingType(booking.getBookingType())
@@ -399,12 +586,37 @@ public class BookingService {
                 .estimatedDurationMinutes(booking.getEstimatedDurationMinutes())
                 .actualDurationMinutes(booking.getActualDurationMinutes())
                 .advancePaid(booking.getAdvancePaid())
+                .bookingSource(booking.getBookingSource())
+                .allocationResult(booking.getAllocationResult())
+                .serviceSlotId(booking.getServiceSlot() != null ? booking.getServiceSlot().getId() : null)
+                .walkInCustomerName(booking.getWalkInCustomerName())
+                .walkInCustomerMobile(booking.getWalkInCustomerMobile())
+                .walkInVehicleDescription(booking.getWalkInVehicleDescription())
                 .mechanicNotes(booking.getMechanicNotes())
                 .customerNotes(booking.getCustomerNotes())
                 .cancellationReason(booking.getCancellationReason())
                 .completedAt(booking.getCompletedAt())
-                .createdAt(booking.getCreatedAt())
-                .build();
+                .createdAt(booking.getCreatedAt());
+
+        if (booking.getVehicleUser() != null) {
+            builder.vehicleUserId(booking.getVehicleUser().getId())
+                   .vehicleUserName(booking.getVehicleUser().getFirstName() + " " +
+                                    booking.getVehicleUser().getLastName());
+        }
+
+        if (booking.getVehicle() != null) {
+            builder.vehicleId(booking.getVehicle().getId())
+                   .vehicleInfo(booking.getVehicle().getMake() + " " +
+                                booking.getVehicle().getModel() + " " +
+                                booking.getVehicle().getYear());
+        }
+
+        if (booking.getServiceSetting() != null) {
+            builder.serviceSettingId(booking.getServiceSetting().getId())
+                   .serviceSettingName(booking.getServiceSetting().getServiceName());
+        }
+
+        return builder.build();
     }
 
     private String generateBookingNumber() {

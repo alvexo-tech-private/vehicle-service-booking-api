@@ -1,0 +1,86 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-create-mechanic-technician-capacity-table
+      author: system
+      comment: >
+        Creates mechanic_technician_capacity table for TYPE_3/4 workshops.
+        Each technician gets individual reserved hours per day.
+        Effective workshop capacity = SUM(reserved_hours WHERE is_active = true).
+        Marking a technician inactive (absent) instantly reduces capacity.
+      changes:
+        - createTable:
+            tableName: mechanic_technician_capacity
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_settings_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: technician_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reserved_hours
+                  type: DECIMAL(5,2)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_technician_capacity
+            baseColumnNames: mechanic_settings_id
+            constraintName: fk_tech_capacity_settings
+            referencedTableName: mechanic_settings
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_tech_capacity_settings
+            tableName: mechanic_technician_capacity
+            columns:
+              - column:
+                  name: mechanic_settings_id
+
+        - createIndex:
+            indexName: idx_tech_capacity_active
+            tableName: mechanic_technician_capacity
+            columns:
+              - column:
+                  name: mechanic_settings_id
+              - column:
+                  name: is_active
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_technician_capacity

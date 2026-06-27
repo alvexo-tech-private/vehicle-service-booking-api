@@ -62,6 +62,14 @@ databaseChangeLog:
                   type: INT
                   defaultValueNumeric: 0
 
+              # Service category for slot routing (TYPE_4) and capacity planning
+              - column:
+                  name: category
+                  type: VARCHAR(10)
+                  defaultValue: GENERAL
+                  constraints:
+                    nullable: false
+
               - column:
                   name: created_at
                   type: TIMESTAMP

@@ -55,6 +55,34 @@ databaseChangeLog:
                   type: DECIMAL(10,2)
                   defaultValueNumeric: 0.00
 
+              # ── Job Card Type System columns ──────────────────────────
+              # WHO created the booking (RIDER_APP, WALK_IN, future: PHONE, ADMIN)
+              - column:
+                  name: booking_source
+                  type: VARCHAR(20)
+
+              # HOW the booking was processed (AUTO_CONFIRMED, MANUAL_REVIEW)
+              - column:
+                  name: allocation_result
+                  type: VARCHAR(20)
+
+              # FK added in 023 after mechanic_service_slots table is created
+              - column:
+                  name: service_slot_id
+                  type: BIGINT
+
+              - column:
+                  name: walk_in_customer_name
+                  type: VARCHAR(100)
+
+              - column:
+                  name: walk_in_customer_mobile
+                  type: VARCHAR(20)
+
+              - column:
+                  name: walk_in_vehicle_description
+                  type: VARCHAR(200)
+
         - addForeignKeyConstraint:
             baseTableName: bookings
             baseColumnNames: service_setting_id
@@ -84,6 +112,27 @@ databaseChangeLog:
             columns:
               - column:
                   name: job_card_number
+
+        - createIndex:
+            indexName: idx_bookings_booking_source
+            tableName: bookings
+            columns:
+              - column:
+                  name: booking_source
+
+        - createIndex:
+            indexName: idx_bookings_allocation_result
+            tableName: bookings
+            columns:
+              - column:
+                  name: allocation_result
+
+        - createIndex:
+            indexName: idx_bookings_service_slot
+            tableName: bookings
+            columns:
+              - column:
+                  name: service_slot_id
 
       rollback:
         - dropIndex:

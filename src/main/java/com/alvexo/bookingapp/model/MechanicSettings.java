@@ -10,6 +10,8 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "mechanic_settings")
@@ -94,6 +96,36 @@ public class MechanicSettings {
      * Stored as JSONB — purely config, never FK-referenced.
      * Structure: [{"serviceName":"...", "durationMinutes":60, "isExpressEligible":true, ...}]
      */
+    // ── Job Card Type System fields ──────────────────────────────────────────
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_card_type", nullable = false)
+    @Builder.Default
+    private JobCardType jobCardType = JobCardType.TYPE_1;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "classification", nullable = false)
+    @Builder.Default
+    private JobCardClassification classification = JobCardClassification.AUTO;
+
+    @Column(name = "total_daily_capacity_hours", precision = 5, scale = 2)
+    private BigDecimal totalDailyCapacityHours;
+
+    @Column(name = "auto_allocation_enabled", nullable = false)
+    @Builder.Default
+    private Boolean autoAllocationEnabled = false;
+
+    @Column(name = "auto_allocation_capacity_hours", precision = 5, scale = 2)
+    private BigDecimal autoAllocationCapacityHours;
+
+    @OneToMany(mappedBy = "mechanicSettings", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<MechanicServiceSlot> serviceSlots = new ArrayList<>();
+
+    @OneToMany(mappedBy = "mechanicSettings", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<MechanicTechnicianCapacity> technicianCapacities = new ArrayList<>();
+
     @Column(name = "preferences", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private String preferences;

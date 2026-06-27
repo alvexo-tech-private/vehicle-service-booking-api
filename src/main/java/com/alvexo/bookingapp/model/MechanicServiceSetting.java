@@ -73,6 +73,11 @@ public class MechanicServiceSetting {
     @Builder.Default
     private Integer displayOrder = 0;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false)
+    @Builder.Default
+    private ServiceCategory category = ServiceCategory.GENERAL;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

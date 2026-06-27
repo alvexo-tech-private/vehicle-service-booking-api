@@ -14,6 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.alvexo.bookingapp.model.AllocationResult;
 import com.alvexo.bookingapp.model.Booking;
 import com.alvexo.bookingapp.model.BookingStatus;
 import com.alvexo.bookingapp.model.User;
@@ -83,4 +84,74 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     
  // 2. Used by job card number generator to produce a daily sequence
     long countByMechanicAndJobCardNumberStartingWith(User mechanic, String prefix);
+
+    // ── Job Card Type System queries ─────────────────────────────────────────
+
+    @Query("""
+            SELECT COUNT(b) FROM Booking b
+            WHERE b.serviceSetting.id = :serviceSettingId
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long countBookingsForServiceOnDate(@Param("serviceSettingId") Long serviceSettingId,
+                                       @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT COALESCE(SUM(b.serviceSetting.durationMinutes), 0) FROM Booking b
+            WHERE b.mechanic.id = :mechanicId
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.allocationResult = :result
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long sumBookedMinutesByAllocationResult(@Param("mechanicId") Long mechanicId,
+                                            @Param("date") LocalDate date,
+                                            @Param("result") AllocationResult result);
+
+    @Query("""
+            SELECT COALESCE(SUM(b.serviceSetting.durationMinutes), 0) FROM Booking b
+            WHERE b.mechanic.id = :mechanicId
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long sumAllBookedMinutesForDate(@Param("mechanicId") Long mechanicId,
+                                    @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT COUNT(b) FROM Booking b
+            WHERE b.serviceSlot.id = :slotId
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long countSlotBookingsForDate(@Param("slotId") Long slotId,
+                                  @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT COUNT(b) FROM Booking b
+            WHERE b.serviceSlot.id = :slotId
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.allocationResult = 'AUTO_CONFIRMED'
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long countAutoConfirmedSlotBookingsForDate(@Param("slotId") Long slotId,
+                                               @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT COALESCE(SUM(b.serviceSetting.durationMinutes), 0) FROM Booking b
+            WHERE b.mechanic.id = :mechanicId
+              AND b.serviceSlot IS NOT NULL
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            """)
+    long sumSlotConsumedMinutesForDate(@Param("mechanicId") Long mechanicId,
+                                       @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT b.bookingSource, COUNT(b) FROM Booking b
+            WHERE b.mechanic.id = :mechanicId
+              AND CAST(b.scheduledDateTime AS LocalDate) = :date
+              AND b.status NOT IN ('CANCELLED', 'REJECTED')
+            GROUP BY b.bookingSource
+            """)
+    List<Object[]> countBookingsBySourceForDate(@Param("mechanicId") Long mechanicId,
+                                                @Param("date") LocalDate date);
 }

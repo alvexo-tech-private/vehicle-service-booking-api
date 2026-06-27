@@ -76,6 +76,38 @@ databaseChangeLog:
                   name: advance_amount
                   type: DECIMAL(10,2)
 
+              # ── Job Card Type System columns ──────────────────────────
+              - column:
+                  name: job_card_type
+                  type: VARCHAR(10)
+                  defaultValue: TYPE_1
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: classification
+                  type: VARCHAR(10)
+                  defaultValue: AUTO
+                  constraints:
+                    nullable: false
+
+              # TYPE_2 — overall hour cap on top of per-service qty
+              - column:
+                  name: total_daily_capacity_hours
+                  type: DECIMAL(5,2)
+
+              - column:
+                  name: auto_allocation_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # TYPE_3/4 — auto-confirm threshold (hours)
+              - column:
+                  name: auto_allocation_capacity_hours
+                  type: DECIMAL(5,2)
+
               # Pure config JSON — UI prefs, not FK-referenced
               - column:
                   name: preferences

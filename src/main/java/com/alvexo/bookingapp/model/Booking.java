@@ -96,6 +96,29 @@ public class Booking {
     @Builder.Default
     private BigDecimal advancePaid = BigDecimal.ZERO;
 
+    // ── Job Card Type System fields ──────────────────────────────────────────
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "booking_source")
+    private BookingSource bookingSource;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "allocation_result")
+    private AllocationResult allocationResult;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_slot_id")
+    private MechanicServiceSlot serviceSlot;
+
+    @Column(name = "walk_in_customer_name", length = 100)
+    private String walkInCustomerName;
+
+    @Column(name = "walk_in_customer_mobile", length = 20)
+    private String walkInCustomerMobile;
+
+    @Column(name = "walk_in_vehicle_description", length = 200)
+    private String walkInVehicleDescription;
+
     @Column(name = "mechanic_notes", columnDefinition = "TEXT")
     private String mechanicNotes;
     

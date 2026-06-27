@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alvexo.bookingapp.dto.request.BookingRequest;
+import com.alvexo.bookingapp.dto.request.MechanicCreatedBookingRequest;
 import com.alvexo.bookingapp.dto.response.BookingResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -77,6 +78,21 @@ public class BookingController {
         return ResponseEntity.ok(MyApiResponse.success(booking));
     }
     
+    @Operation(summary = "Create a walk-in booking",
+               description = "Mechanic creates a booking for a walk-in customer. TYPE_3/4 only. Auto-confirmed with job card.")
+    @PostMapping("/walk-in")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> createWalkInBooking(
+            @Valid @RequestBody MechanicCreatedBookingRequest request,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.createWalkInBooking(request, mechanic);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(MyApiResponse.success("Walk-in booking created successfully", response));
+    }
+
     @Operation(summary = "Update booking status", description = "Mechanic or admin updates the status of a booking (e.g. CONFIRMED, COMPLETED, CANCELLED).")
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MECHANIC', 'ADMINISTRATOR')")   
