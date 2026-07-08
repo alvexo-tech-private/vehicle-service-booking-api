@@ -566,6 +566,44 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    /**
+     * Changes the account password for any authenticated user.
+     * Re-verifies the current password before accepting the new one and
+     * invalidates all refresh tokens so other devices must re-authenticate.
+     */
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BadRequestException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
+    }
+
+    /**
+     * Records an account-deletion request. The account is deactivated immediately;
+     * actual data erasure is handled by an out-of-band retention/erasure job.
+     */
+    @Transactional
+    public String requestAccountDeletion(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setActive(false);
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
+
+        return "DEL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
     private String generateUniqueReferralCode() {
         String code;
         do {

@@ -144,6 +144,19 @@ public class NotificationService {
         mailSender.send(message);
     }
 
+    /**
+     * Sends an OTP to verify a workshop owner's WhatsApp number.
+     * (SMS/WhatsApp delivery is not yet implemented — delivered via the owner's account email.)
+     */
+    public void sendWhatsappVerificationOtp(String accountEmail, String otp) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(accountEmail);
+        message.setSubject("Verify your WhatsApp number");
+        message.setText("Your OTP to verify your WhatsApp number is: " + otp
+                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
+        mailSender.send(message);
+    }
+
     @Transactional
     public void markAsRead(Long notificationId, User user) {
         Notification notification = notificationRepository.findById(notificationId)

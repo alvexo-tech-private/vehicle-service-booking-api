@@ -44,3 +44,32 @@ databaseChangeLog:
           file: db/changelog/changes/021-seed-system-admin-user.yaml
   - include:
           file: db/changelog/changes/022-seed-vehicle-catalogue.yaml
+  # ── Workshop Profile feature ─────────────────────────────────────────────────
+  - include:
+      file: db/changelog/changes/023-create-stored-files-table.yaml
+  - include:
+      file: db/changelog/changes/024-create-workshop-profiles-table.yaml
+  - include:
+      file: db/changelog/changes/025-create-workshop-owner-infos-table.yaml
+  - include:
+      file: db/changelog/changes/026-create-workshop-images-table.yaml
+  - include:
+      file: db/changelog/changes/027-create-referral-partner-codes-table.yaml
+  - include:
+      file: db/changelog/changes/028-create-workshop-referrals-table.yaml
+  - include:
+      file: db/changelog/changes/029-create-workshop-onboardings-table.yaml
+  - include:
+      file: db/changelog/changes/030-create-workshop-verifications-table.yaml
+  - include:
+      file: db/changelog/changes/031-create-workshop-pickup-drop-statuses-table.yaml
+  - include:
+      file: db/changelog/changes/032-create-workshop-payment-setups-table.yaml
+  - include:
+      file: db/changelog/changes/033-create-workshop-notification-preferences-table.yaml
+  - include:
+      file: db/changelog/changes/034-create-workshop-support-requests-table.yaml
+  - include:
+      file: db/changelog/changes/035-create-legal-documents-table.yaml
+  - include:
+      file: db/changelog/changes/036-create-workshop-legal-consents-table.yaml

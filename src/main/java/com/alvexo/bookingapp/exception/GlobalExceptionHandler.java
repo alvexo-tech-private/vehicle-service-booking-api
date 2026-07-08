@@ -27,7 +27,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(MyApiResponse.error(ex.getMessage()));
     }
-    
+
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<MyApiResponse<Void>> handleBusinessRule(BusinessRuleException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(MyApiResponse.error(ex.getCode(), ex.getMessage()));
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<MyApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -53,6 +59,7 @@ public class GlobalExceptionHandler {
                 .body(MyApiResponse.<Map<String, String>>builder()
                         .success(false)
                         .message("Validation failed")
+                        .errorCode("VALIDATION_ERROR")
                         .data(errors)
                         .build());
     }
