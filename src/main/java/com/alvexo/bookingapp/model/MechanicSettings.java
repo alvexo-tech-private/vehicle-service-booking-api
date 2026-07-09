@@ -47,6 +47,32 @@ public class MechanicSettings {
     private Boolean reserveCapacity = false;
 
     /**
+     * Internal job-card generation mode behind the mechanic-facing
+     * Workshop Capacity Level (1-4). AUTO -> Level 1/2, MECHANIC -> Level 3/4.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_card_type", nullable = false, length = 20)
+    @Builder.Default
+    private JobCardType jobCardType = JobCardType.AUTO;
+
+    /**
+     * Only meaningful when jobCardType = MECHANIC.
+     * false -> Level 3 (Mechanic Day), true -> Level 4 (Mechanic Slot).
+     */
+    @Column(name = "reserve_for_slots", nullable = false)
+    @Builder.Default
+    private Boolean reserveForSlots = false;
+
+    /**
+     * Derived from (jobCardType, reserveCapacity, reserveForSlots) and persisted
+     * for convenience — drives which Home dashboard layout the mobile app renders.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "classification", nullable = false, length = 20)
+    @Builder.Default
+    private WorkshopClassification classification = WorkshopClassification.TYPE_1;
+
+    /**
      * Total working capacity in hours per day.
      * Required when reserveCapacity = true.
      * Bookings are allowed until SUM(service durations) reaches this limit.
@@ -88,6 +114,20 @@ public class MechanicSettings {
      */
     @Column(name = "advance_amount", precision = 10, scale = 2)
     private BigDecimal advanceAmount;
+
+    /**
+     * Open Booking / Auto-Allocation toggle — lets bookings be auto-assigned
+     * up to autoAllocationCapacityHours worth of work per day.
+     */
+    @Column(name = "auto_allocation_enabled", nullable = false)
+    @Builder.Default
+    private Boolean autoAllocationEnabled = false;
+
+    /**
+     * Required when autoAllocationEnabled = true (min 0.5, enforced at API layer).
+     */
+    @Column(name = "auto_allocation_capacity_hours", precision = 5, scale = 2)
+    private BigDecimal autoAllocationCapacityHours;
 
     /**
      * JSON array of service configurations offered by this mechanic.

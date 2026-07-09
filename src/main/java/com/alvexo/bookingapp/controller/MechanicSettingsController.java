@@ -1,8 +1,10 @@
 package com.alvexo.bookingapp.controller;
 
 import com.alvexo.bookingapp.dto.request.MechanicServiceSettingRequest;
+import com.alvexo.bookingapp.dto.request.MechanicServiceSlotsRequest;
 import com.alvexo.bookingapp.dto.request.MechanicSettingsRequest;
 import com.alvexo.bookingapp.dto.response.MechanicServiceSettingResponse;
+import com.alvexo.bookingapp.dto.response.MechanicServiceSlotResponse;
 import com.alvexo.bookingapp.dto.response.MechanicSettingsResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -151,6 +153,42 @@ public class MechanicSettingsController {
 
         return ResponseEntity.ok(MyApiResponse.success(
                 settingsService.getActiveServiceSettings(mechanicId)));
+    }
+
+    // ── Service slots (Slot 1 / Slot 2 — Level 4) ──────────────────────────────
+
+    @Operation(
+        summary = "Save service slots (create or update)",
+        description = """
+            Upserts Slot 1 / Slot 2 configuration by slotNumber. Only meaningful
+            for Workshop Capacity Level 4 (Mechanic Slot), but stored regardless
+            of the mechanic's current Level. Mechanic settings must already exist.
+            """
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Slots saved"),
+        @ApiResponse(responseCode = "400", description = "Validation failed or settings not yet created")
+    })
+    @RequestMapping(value = "/service-slots", method = {RequestMethod.POST, RequestMethod.PUT})
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<List<MechanicServiceSlotResponse>>> saveServiceSlots(
+            @Valid @RequestBody MechanicServiceSlotsRequest request,
+            Authentication authentication) {
+
+        User mechanic = resolveUser(authentication);
+        List<MechanicServiceSlotResponse> response = settingsService.saveServiceSlots(mechanic, request);
+        return ResponseEntity.ok(MyApiResponse.success("Service slots saved successfully", response));
+    }
+
+    @Operation(summary = "Get service slots for a mechanic",
+               description = "Returns Slot 1 / Slot 2 configuration, ordered by slotNumber.")
+    @GetMapping("/{mechanicId}/service-slots")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<MyApiResponse<List<MechanicServiceSlotResponse>>> getServiceSlots(
+            @PathVariable Long mechanicId) {
+
+        return ResponseEntity.ok(MyApiResponse.success(
+                settingsService.getServiceSlots(mechanicId)));
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

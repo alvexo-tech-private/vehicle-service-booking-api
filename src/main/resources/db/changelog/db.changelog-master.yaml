@@ -44,3 +44,10 @@ databaseChangeLog:
           file: db/changelog/changes/021-seed-system-admin-user.yaml
   - include:
           file: db/changelog/changes/022-seed-vehicle-catalogue.yaml
+  # ── Workshop Settings / Home dashboard feature ───────────────────────────────
+  - include:
+          file: db/changelog/changes/023-add-classification-to-mechanic-settings.yaml
+  - include:
+          file: db/changelog/changes/024-add-category-to-mechanic-service-settings.yaml
+  - include:
+          file: db/changelog/changes/025-create-mechanic-service-slots-table.yaml
