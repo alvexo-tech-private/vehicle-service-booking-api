@@ -78,6 +78,9 @@ public class MechanicSettingsRequest {
     @DecimalMin(value = "0.5", message = "autoAllocationCapacityHours must be at least 0.5")
     private BigDecimal autoAllocationCapacityHours;
 
+    @NotNull(message = "autoIssue is required")
+    private Boolean autoIssue;
+
     @Valid
     private List<MechanicServiceSettingRequest> serviceSettings;
 }

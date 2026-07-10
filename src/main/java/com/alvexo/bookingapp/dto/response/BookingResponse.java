@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.alvexo.bookingapp.model.BookingChannel;
 import com.alvexo.bookingapp.model.BookingStatus;
 import com.alvexo.bookingapp.model.BookingType;
 import com.alvexo.bookingapp.model.ServiceType;
@@ -35,6 +36,7 @@ public class BookingResponse {
     private LocalDateTime scheduledDateTime;
     private BookingStatus status;
     private BookingType bookingType;
+    private BookingChannel channel;
     private ServiceType serviceType;
     private String description;
 

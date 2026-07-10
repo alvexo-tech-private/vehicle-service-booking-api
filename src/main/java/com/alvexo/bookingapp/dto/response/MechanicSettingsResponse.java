@@ -36,6 +36,7 @@ public class MechanicSettingsResponse {
 
     private Boolean autoAllocationEnabled;
     private BigDecimal autoAllocationCapacityHours;
+    private Boolean autoIssue;
 
     private List<MechanicServiceSettingResponse> serviceSettings;
 

@@ -130,6 +130,14 @@ public class MechanicSettings {
     private BigDecimal autoAllocationCapacityHours;
 
     /**
+     * Whether job cards are issued automatically on booking confirmation
+     * (true) or require an explicit mechanic action (false).
+     */
+    @Column(name = "auto_issue", nullable = false)
+    @Builder.Default
+    private Boolean autoIssue = true;
+
+    /**
      * JSON array of service configurations offered by this mechanic.
      * Stored as JSONB — purely config, never FK-referenced.
      * Structure: [{"serviceName":"...", "durationMinutes":60, "isExpressEligible":true, ...}]

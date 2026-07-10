@@ -28,13 +28,16 @@ public class MechanicSettingsService {
     private final MechanicSettingsRepository settingsRepository;
     private final MechanicServiceSettingRepository serviceSettingRepository;
     private final MechanicServiceSlotRepository serviceSlotRepository;
+    private final MechanicSettingsAuditLogService auditLogService;
 
     public MechanicSettingsService(MechanicSettingsRepository settingsRepository,
                                    MechanicServiceSettingRepository serviceSettingRepository,
-                                   MechanicServiceSlotRepository serviceSlotRepository) {
+                                   MechanicServiceSlotRepository serviceSlotRepository,
+                                   MechanicSettingsAuditLogService auditLogService) {
         this.settingsRepository = settingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
         this.serviceSlotRepository = serviceSlotRepository;
+        this.auditLogService = auditLogService;
     }
 
     // ── Create or replace all settings (upsert) ───────────────────────────────
@@ -47,8 +50,14 @@ public class MechanicSettingsService {
         MechanicSettings settings = settingsRepository.findByMechanic(mechanic)
                 .orElse(MechanicSettings.builder().mechanic(mechanic).build());
 
+        MechanicSettings before = settings.getId() != null ? copyOf(settings) : null;
+
         applyRequest(settings, request);
         settings = settingsRepository.save(settings);
+
+        if (before != null) {
+            logSettingsChanges(mechanic, before, settings);
+        }
 
         // Replace service settings if provided
         if (request.getServiceSettings() != null) {
@@ -167,6 +176,44 @@ public class MechanicSettingsService {
         return BookingType.STANDARD;
     }
 
+    // ── Audit ─────────────────────────────────────────────────────────────────
+
+    /** Shallow snapshot of the audited fields, taken before applyRequest overwrites them. */
+    private MechanicSettings copyOf(MechanicSettings s) {
+        return MechanicSettings.builder()
+                .jobCardType(s.getJobCardType())
+                .maxVehiclesPerDay(s.getMaxVehiclesPerDay())
+                .reserveCapacity(s.getReserveCapacity())
+                .reserveForSlots(s.getReserveForSlots())
+                .fullDayCapacityHours(s.getFullDayCapacityHours())
+                .jobCardSerialPrefix(s.getJobCardSerialPrefix())
+                .serviceReportingTime(s.getServiceReportingTime())
+                .expressReportingTime(s.getExpressReportingTime())
+                .advanceEnabled(s.getAdvanceEnabled())
+                .advanceAmount(s.getAdvanceAmount())
+                .autoAllocationEnabled(s.getAutoAllocationEnabled())
+                .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
+                .autoIssue(s.getAutoIssue())
+                .build();
+    }
+
+    private void logSettingsChanges(User mechanic, MechanicSettings before, MechanicSettings after) {
+        String entityType = "MECHANIC_SETTINGS";
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "jobCardType", before.getJobCardType(), after.getJobCardType());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "maxVehiclesPerDay", before.getMaxVehiclesPerDay(), after.getMaxVehiclesPerDay());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "reserveCapacity", before.getReserveCapacity(), after.getReserveCapacity());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "reserveForSlots", before.getReserveForSlots(), after.getReserveForSlots());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "fullDayCapacityHours", before.getFullDayCapacityHours(), after.getFullDayCapacityHours());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "jobCardSerialPrefix", before.getJobCardSerialPrefix(), after.getJobCardSerialPrefix());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "serviceReportingTime", before.getServiceReportingTime(), after.getServiceReportingTime());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "expressReportingTime", before.getExpressReportingTime(), after.getExpressReportingTime());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "advanceEnabled", before.getAdvanceEnabled(), after.getAdvanceEnabled());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "advanceAmount", before.getAdvanceAmount(), after.getAdvanceAmount());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationEnabled", before.getAutoAllocationEnabled(), after.getAutoAllocationEnabled());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationCapacityHours", before.getAutoAllocationCapacityHours(), after.getAutoAllocationCapacityHours());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoIssue", before.getAutoIssue(), after.getAutoIssue());
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void validateRole(User mechanic) {
@@ -211,6 +258,7 @@ public class MechanicSettingsService {
         s.setAdvanceAmount(r.getAdvanceAmount());
         s.setAutoAllocationEnabled(r.getAutoAllocationEnabled());
         s.setAutoAllocationCapacityHours(r.getAutoAllocationCapacityHours());
+        s.setAutoIssue(r.getAutoIssue());
     }
 
     /**
@@ -274,6 +322,7 @@ public class MechanicSettingsService {
                 .advanceAmount(s.getAdvanceAmount())
                 .autoAllocationEnabled(s.getAutoAllocationEnabled())
                 .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
+                .autoIssue(s.getAutoIssue())
                 .serviceSettings(services)
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())

@@ -35,6 +35,12 @@ public class MechanicDashboardResponse {
     /** Job Card Waiting List — bookings today still PENDING (Types 3/4). */
     private Long pendingCount;
 
+    /** Bookings today recorded via BookingChannel.WALK_IN. */
+    private Long walkInCount;
+
+    /** Bookings today recorded via BookingChannel.RIDER_APP. */
+    private Long riderCount;
+
     /** Percentage of the day's capacity consumed (vehicle-count or hour-slot basis). */
     private BigDecimal capacityUtilizationPercent;
 

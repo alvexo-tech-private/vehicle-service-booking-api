@@ -83,4 +83,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     
  // 2. Used by job card number generator to produce a daily sequence
     long countByMechanicAndJobCardNumberStartingWith(User mechanic, String prefix);
+
+    /** All completed bookings for a mechanic, most recent first — used to derive service-due reminders per vehicle. */
+    @Query("SELECT b FROM Booking b WHERE b.mechanic = :mechanic AND b.status = 'COMPLETED' " +
+           "ORDER BY b.completedAt DESC")
+    List<Booking> findCompletedBookingsByMechanicOrderByCompletedAtDesc(@Param("mechanic") User mechanic);
 }
