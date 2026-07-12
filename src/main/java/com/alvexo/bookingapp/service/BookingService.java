@@ -14,14 +14,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alvexo.bookingapp.dto.request.BookingRequest;
+import com.alvexo.bookingapp.dto.request.WalkInBookingRequest;
 import com.alvexo.bookingapp.dto.response.BookingResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.Booking;
+import com.alvexo.bookingapp.model.BookingChannel;
 import com.alvexo.bookingapp.model.BookingStatus;
 import com.alvexo.bookingapp.model.BookingType;
 import com.alvexo.bookingapp.model.DayOfWeek;
 import com.alvexo.bookingapp.model.MechanicAvailability;
+import com.alvexo.bookingapp.model.MechanicDailyOverride;
 import com.alvexo.bookingapp.model.MechanicServiceSetting;
 import com.alvexo.bookingapp.model.MechanicSettings;
 import com.alvexo.bookingapp.model.NotificationType;
@@ -45,6 +48,8 @@ public class BookingService {
     private final MechanicSettingsRepository mechanicSettingsRepository;
     private final MechanicServiceSettingRepository serviceSettingRepository;
     private final NotificationService notificationService;
+    private final MechanicHolidayService holidayService;
+    private final MechanicDailyOverrideService dailyOverrideService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -53,7 +58,9 @@ public class BookingService {
             MechanicAvailabilityRepository availabilityRepository,
             MechanicSettingsRepository mechanicSettingsRepository,
             MechanicServiceSettingRepository serviceSettingRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            MechanicHolidayService holidayService,
+            MechanicDailyOverrideService dailyOverrideService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
@@ -61,6 +68,8 @@ public class BookingService {
         this.mechanicSettingsRepository = mechanicSettingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
         this.notificationService = notificationService;
+        this.holidayService = holidayService;
+        this.dailyOverrideService = dailyOverrideService;
     }
 
     /**
@@ -106,6 +115,9 @@ public class BookingService {
             throw new BadRequestException("Bookings cannot be made for past dates");
         }
 
+        // 3b. Reject bookings on a Holiday/Pause date
+        rejectIfHolidayOrPause(mechanic, request.getScheduledDateTime().toLocalDate());
+
         // 4. Validate slot within mechanic's availability template
         validateSlotWithinAvailability(mechanic, request.getScheduledDateTime());
 
@@ -127,81 +139,9 @@ public class BookingService {
         }
 
         // 7. Settings-aware capacity checks
-        BookingType bookingType = BookingType.STANDARD;
-        BigDecimal requiredAdvance = BigDecimal.ZERO;
-
-        if (settingsOpt.isPresent()) {
-            MechanicSettings settings = settingsOpt.get();
-
-            if (Boolean.TRUE.equals(settings.getReserveCapacity())) {
-                // ── Hour-slot mode ────────────────────────────────────────────
-                if (serviceSetting == null) {
-                    throw new BadRequestException(
-                            "serviceSettingId is required for this mechanic (hour-slot mode)");
-                }
-
-                int durationMinutes = serviceSetting.getDurationMinutes();
-
-                // Check global hour capacity
-                int bookedMinutes = serviceSettingRepository
-                        .sumBookedMinutesForDate(mechanic.getId(), bookingDate);
-                int capacityMinutes = settings.getFullDayCapacityHours()
-                        .multiply(BigDecimal.valueOf(60)).intValue();
-
-                if ((bookedMinutes + durationMinutes) > capacityMinutes) {
-                    throw new BadRequestException(
-                            "Mechanic's daily capacity is full for " + bookingDate +
-                            ". Available: " + (capacityMinutes - bookedMinutes) + " min.");
-                }
-
-                // Check per-service cap
-                if (serviceSetting.getMaxSlotsPerDay() != null) {
-                    int serviceCount = serviceSettingRepository
-                            .countBookingsForServiceOnDate(serviceSetting.getId(), bookingDate);
-                    if (serviceCount >= serviceSetting.getMaxSlotsPerDay()) {
-                        throw new BadRequestException(
-                                "No more slots available for service '" +
-                                serviceSetting.getServiceName() + "' on " + bookingDate);
-                    }
-                }
-
-                // Determine booking type
-                if (settings.getExpressReportingTime() != null &&
-                    request.getScheduledDateTime().toLocalTime()
-                           .isBefore(settings.getExpressReportingTime())) {
-
-                    if (!Boolean.TRUE.equals(serviceSetting.getIsExpressEligible())) {
-                        throw new BadRequestException(
-                                "Service '" + serviceSetting.getServiceName() +
-                                "' is not eligible for express booking");
-                    }
-                    bookingType = BookingType.EXPRESS;
-                }
-
-            } else {
-                // ── Vehicle-count mode ────────────────────────────────────────
-                long activeCount = bookingRepository.countActiveBookingsForMechanicOnDate(
-                        mechanic, bookingDate);
-                if (activeCount >= settings.getMaxVehiclesPerDay()) {
-                    throw new BadRequestException(
-                            "Mechanic has reached the maximum vehicle limit (" +
-                            settings.getMaxVehiclesPerDay() + ") for " + bookingDate);
-                }
-            }
-
-            // Advance payment check
-            if (Boolean.TRUE.equals(settings.getAdvanceEnabled()) &&
-                settings.getAdvanceAmount() != null) {
-                requiredAdvance = settings.getAdvanceAmount();
-                BigDecimal paidAdvance = request.getAdvancePaid() != null
-                        ? request.getAdvancePaid() : BigDecimal.ZERO;
-                if (paidAdvance.compareTo(requiredAdvance) < 0) {
-                    throw new BadRequestException(
-                            "Advance payment of INR " + requiredAdvance +
-                            " is required to confirm this booking");
-                }
-            }
-        }
+        BookingType bookingType = checkCapacityAndResolveBookingType(
+                mechanic, serviceSetting, bookingDate, request.getScheduledDateTime(),
+                request.getAdvancePaid(), settingsOpt);
 
         // 8. PESSIMISTIC LOCK — concurrency layer 1
         List<Booking> conflicts = bookingRepository.findAndLockConflicting(
@@ -221,6 +161,7 @@ public class BookingService {
                 .scheduledDateTime(request.getScheduledDateTime())
                 .status(BookingStatus.PENDING)
                 .bookingType(bookingType)
+                .channel(BookingChannel.ONLINE)
                 .serviceType(request.getServiceType())
                 .description(request.getDescription())
                 .estimatedCost(request.getEstimatedCost())
@@ -256,6 +197,180 @@ public class BookingService {
         return convertToResponse(booking);
     }
 
+    /**
+     * Mechanic-recorded walk-in booking. Confirmed immediately (no PENDING
+     * approval step, since the customer is physically present) and tagged
+     * channel = WALK_IN for Home dashboard counters. Still subject to the
+     * same capacity/advance rules as an online booking.
+     */
+    @Transactional
+    public BookingResponse createWalkInBooking(WalkInBookingRequest request, User mechanic) {
+        if (mechanic.getRole() != UserRole.MECHANIC) {
+            throw new BadRequestException("Only mechanics can record walk-in bookings");
+        }
+
+        User vehicleUser = userRepository.findById(request.getVehicleUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle user not found"));
+
+        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
+
+        LocalDateTime scheduledDateTime = request.getScheduledDateTime() != null
+                ? request.getScheduledDateTime() : LocalDateTime.now();
+        LocalDate bookingDate = scheduledDateTime.toLocalDate();
+
+        rejectIfHolidayOrPause(mechanic, bookingDate);
+
+        MechanicServiceSetting serviceSetting = null;
+        if (request.getServiceSettingId() != null) {
+            serviceSetting = serviceSettingRepository.findById(request.getServiceSettingId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Service setting not found"));
+            if (!serviceSetting.getMechanic().getId().equals(mechanic.getId())) {
+                throw new BadRequestException("Service does not belong to this mechanic");
+            }
+        }
+
+        Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(mechanic);
+        BookingType bookingType = checkCapacityAndResolveBookingType(
+                mechanic, serviceSetting, bookingDate, scheduledDateTime,
+                request.getAdvancePaid(), settingsOpt);
+
+        List<Booking> conflicts = bookingRepository.findAndLockConflicting(mechanic, scheduledDateTime);
+        if (!conflicts.isEmpty()) {
+            throw new BadRequestException("This slot is already booked. Please choose a different time.");
+        }
+
+        boolean autoIssue = settingsOpt.map(MechanicSettings::getAutoIssue).orElse(true);
+
+        Booking booking = Booking.builder()
+                .vehicleUser(vehicleUser)
+                .mechanic(mechanic)
+                .vehicle(vehicle)
+                .serviceSetting(serviceSetting)
+                .bookingNumber(generateBookingNumber())
+                .scheduledDateTime(scheduledDateTime)
+                .status(BookingStatus.CONFIRMED)
+                .bookingType(bookingType)
+                .channel(BookingChannel.WALK_IN)
+                .serviceType(request.getServiceType())
+                .description(request.getDescription())
+                .estimatedCost(request.getEstimatedCost())
+                .estimatedDurationMinutes(
+                        serviceSetting != null
+                        ? serviceSetting.getDurationMinutes()
+                        : request.getEstimatedDurationMinutes())
+                .advancePaid(request.getAdvancePaid() != null
+                        ? request.getAdvancePaid() : BigDecimal.ZERO)
+                .customerNotes(request.getCustomerNotes())
+                .build();
+
+        if (autoIssue) {
+            booking.setJobCardNumber(generateJobCardNumber(booking));
+        }
+
+        try {
+            booking = bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException e) {
+            if (e.getMessage() != null && e.getMessage().contains("uq_mechanic_slot")) {
+                throw new BadRequestException(
+                        "This slot was just taken by another booking. Please choose a different time.");
+            }
+            throw e;
+        }
+
+        return convertToResponse(booking);
+    }
+
+    /**
+     * Shared capacity/advance validation for both online and walk-in bookings.
+     * Returns the resolved BookingType (STANDARD/EXPRESS); throws BadRequestException
+     * if capacity is exhausted or the required advance hasn't been paid.
+     */
+    private BookingType checkCapacityAndResolveBookingType(User mechanic,
+                                                            MechanicServiceSetting serviceSetting,
+                                                            LocalDate bookingDate,
+                                                            LocalDateTime scheduledDateTime,
+                                                            BigDecimal advancePaid,
+                                                            Optional<MechanicSettings> settingsOpt) {
+        BookingType bookingType = BookingType.STANDARD;
+        if (settingsOpt.isEmpty()) {
+            return bookingType;
+        }
+
+        MechanicSettings settings = settingsOpt.get();
+        Optional<MechanicDailyOverride> overrideOpt = dailyOverrideService.findOverride(mechanic, bookingDate);
+
+        BigDecimal fullDayCapacityHours = overrideOpt.map(MechanicDailyOverride::getFullDayCapacityHoursOverride)
+                .orElse(settings.getFullDayCapacityHours());
+        Integer maxVehiclesPerDay = overrideOpt.map(MechanicDailyOverride::getMaxVehiclesPerDayOverride)
+                .orElse(settings.getMaxVehiclesPerDay());
+        Boolean advanceEnabled = overrideOpt.map(MechanicDailyOverride::getAdvanceEnabledOverride)
+                .orElse(settings.getAdvanceEnabled());
+        BigDecimal advanceAmount = overrideOpt.map(MechanicDailyOverride::getAdvanceAmountOverride)
+                .orElse(settings.getAdvanceAmount());
+
+        if (Boolean.TRUE.equals(settings.getReserveCapacity())) {
+            // ── Hour-slot mode ────────────────────────────────────────────
+            if (serviceSetting == null) {
+                throw new BadRequestException(
+                        "serviceSettingId is required for this mechanic (hour-slot mode)");
+            }
+
+            int durationMinutes = serviceSetting.getDurationMinutes();
+
+            int bookedMinutes = serviceSettingRepository
+                    .sumBookedMinutesForDate(mechanic.getId(), bookingDate);
+            int capacityMinutes = fullDayCapacityHours
+                    .multiply(BigDecimal.valueOf(60)).intValue();
+
+            if ((bookedMinutes + durationMinutes) > capacityMinutes) {
+                throw new BadRequestException(
+                        "Mechanic's daily capacity is full for " + bookingDate +
+                        ". Available: " + (capacityMinutes - bookedMinutes) + " min.");
+            }
+
+            if (serviceSetting.getMaxSlotsPerDay() != null) {
+                int serviceCount = serviceSettingRepository
+                        .countBookingsForServiceOnDate(serviceSetting.getId(), bookingDate);
+                if (serviceCount >= serviceSetting.getMaxSlotsPerDay()) {
+                    throw new BadRequestException(
+                            "No more slots available for service '" +
+                            serviceSetting.getServiceName() + "' on " + bookingDate);
+                }
+            }
+
+            if (settings.getExpressReportingTime() != null &&
+                scheduledDateTime.toLocalTime().isBefore(settings.getExpressReportingTime())) {
+
+                if (!Boolean.TRUE.equals(serviceSetting.getIsExpressEligible())) {
+                    throw new BadRequestException(
+                            "Service '" + serviceSetting.getServiceName() +
+                            "' is not eligible for express booking");
+                }
+                bookingType = BookingType.EXPRESS;
+            }
+
+        } else {
+            // ── Vehicle-count mode ────────────────────────────────────────
+            long activeCount = bookingRepository.countActiveBookingsForMechanicOnDate(mechanic, bookingDate);
+            if (activeCount >= maxVehiclesPerDay) {
+                throw new BadRequestException(
+                        "Mechanic has reached the maximum vehicle limit (" +
+                        maxVehiclesPerDay + ") for " + bookingDate);
+            }
+        }
+
+        if (Boolean.TRUE.equals(advanceEnabled) && advanceAmount != null) {
+            BigDecimal paidAdvance = advancePaid != null ? advancePaid : BigDecimal.ZERO;
+            if (paidAdvance.compareTo(advanceAmount) < 0) {
+                throw new BadRequestException(
+                        "Advance payment of INR " + advanceAmount + " is required to confirm this booking");
+            }
+        }
+
+        return bookingType;
+    }
+
     @Transactional
     public BookingResponse updateBookingStatus(Long bookingId, BookingStatus newStatus, User user) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -267,9 +382,16 @@ public class BookingService {
             }
         }
 
-        // On confirmation, generate job card number if not already set
+        // On confirmation, generate job card number if not already set —
+        // unless the mechanic has autoIssue = false, in which case a job card
+        // must be issued explicitly via issueJobCard().
         if (newStatus == BookingStatus.CONFIRMED && booking.getJobCardNumber() == null) {
-            booking.setJobCardNumber(generateJobCardNumber(booking));
+            boolean autoIssue = mechanicSettingsRepository.findByMechanic(booking.getMechanic())
+                    .map(MechanicSettings::getAutoIssue)
+                    .orElse(true);
+            if (autoIssue) {
+                booking.setJobCardNumber(generateJobCardNumber(booking));
+            }
         }
 
         booking.setStatus(newStatus);
@@ -304,6 +426,76 @@ public class BookingService {
         return convertToResponse(booking);
     }
 
+    /**
+     * Reschedules a booking to a new date/time. Re-runs the same conflict
+     * checks as booking creation; does not re-run capacity checks, since the
+     * booking already holds a capacity slot for that day (rescheduling within
+     * the same mechanic's calendar doesn't change total daily demand).
+     */
+    @Transactional
+    public BookingResponse rescheduleBooking(Long bookingId, LocalDateTime newScheduledDateTime, User mechanic) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+            throw new BadRequestException("Only the assigned mechanic can reschedule this booking");
+        }
+        if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.REJECTED
+                || booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new BadRequestException("Cannot reschedule a " + booking.getStatus() + " booking");
+        }
+        if (newScheduledDateTime.isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("Cannot reschedule to a past date/time");
+        }
+
+        List<Booking> conflicts = bookingRepository.findAndLockConflicting(mechanic, newScheduledDateTime);
+        if (!conflicts.isEmpty()) {
+            throw new BadRequestException("The requested time is already booked. Please choose a different time.");
+        }
+
+        booking.setScheduledDateTime(newScheduledDateTime);
+
+        try {
+            booking = bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException e) {
+            throw new BadRequestException("This slot was just taken. Please choose another.");
+        }
+
+        notificationService.createNotification(
+                booking.getVehicleUser(),
+                "Booking Rescheduled",
+                "Your booking #" + booking.getBookingNumber() + " has been rescheduled to " + newScheduledDateTime,
+                NotificationType.GENERAL,
+                "Booking",
+                booking.getId());
+
+        return convertToResponse(booking);
+    }
+
+    /**
+     * Manually issues a job card for a CONFIRMED booking whose mechanic has
+     * autoIssue = false. No-op error if a job card already exists.
+     */
+    @Transactional
+    public BookingResponse issueJobCard(Long bookingId, User mechanic) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+            throw new BadRequestException("Only the assigned mechanic can issue this job card");
+        }
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Job cards can only be issued for CONFIRMED bookings");
+        }
+        if (booking.getJobCardNumber() != null) {
+            throw new BadRequestException("Job card already issued: " + booking.getJobCardNumber());
+        }
+
+        booking.setJobCardNumber(generateJobCardNumber(booking));
+        booking = bookingRepository.save(booking);
+        return convertToResponse(booking);
+    }
+
     public Page<BookingResponse> getUserBookings(User user, Pageable pageable) {
         if (user.getRole() == UserRole.MECHANIC) {
             return bookingRepository.findByMechanic(user, pageable).map(this::convertToResponse);
@@ -325,6 +517,14 @@ public class BookingService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void rejectIfHolidayOrPause(User mechanic, LocalDate date) {
+        holidayService.findHoliday(mechanic, date).ifPresent(holiday -> {
+            throw new BadRequestException(
+                    "Mechanic is on " + holiday.getType().name().toLowerCase() + " on " + date
+                            + (holiday.getReason() != null ? " (" + holiday.getReason() + ")" : ""));
+        });
+    }
 
     private void validateSlotWithinAvailability(User mechanic, LocalDateTime scheduledDateTime) {
         DayOfWeek dayOfWeek = DayOfWeek.valueOf(scheduledDateTime.getDayOfWeek().name());
@@ -392,6 +592,7 @@ public class BookingService {
                 .scheduledDateTime(booking.getScheduledDateTime())
                 .status(booking.getStatus())
                 .bookingType(booking.getBookingType())
+                .channel(booking.getChannel())
                 .serviceType(booking.getServiceType())
                 .description(booking.getDescription())
                 .estimatedCost(booking.getEstimatedCost())

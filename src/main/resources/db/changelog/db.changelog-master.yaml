@@ -44,32 +44,26 @@ databaseChangeLog:
           file: db/changelog/changes/021-seed-system-admin-user.yaml
   - include:
           file: db/changelog/changes/022-seed-vehicle-catalogue.yaml
-  # ── Workshop Profile feature ─────────────────────────────────────────────────
+  # ── Workshop Settings / Home dashboard feature ───────────────────────────────
   - include:
-      file: db/changelog/changes/023-create-stored-files-table.yaml
+          file: db/changelog/changes/023-add-classification-to-mechanic-settings.yaml
   - include:
-      file: db/changelog/changes/024-create-workshop-profiles-table.yaml
+          file: db/changelog/changes/024-add-category-to-mechanic-service-settings.yaml
   - include:
-      file: db/changelog/changes/025-create-workshop-owner-infos-table.yaml
+          file: db/changelog/changes/025-create-mechanic-service-slots-table.yaml
   - include:
-      file: db/changelog/changes/026-create-workshop-images-table.yaml
+          file: db/changelog/changes/026-add-auto-issue-to-mechanic-settings.yaml
   - include:
-      file: db/changelog/changes/027-create-referral-partner-codes-table.yaml
+          file: db/changelog/changes/027-create-mechanic-configuration-settings-table.yaml
   - include:
-      file: db/changelog/changes/028-create-workshop-referrals-table.yaml
+          file: db/changelog/changes/028-create-mechanic-master-entries-table.yaml
   - include:
-      file: db/changelog/changes/029-create-workshop-onboardings-table.yaml
+          file: db/changelog/changes/029-add-channel-to-bookings.yaml
   - include:
-      file: db/changelog/changes/030-create-workshop-verifications-table.yaml
+          file: db/changelog/changes/030-create-mechanic-promotional-offers-table.yaml
   - include:
-      file: db/changelog/changes/031-create-workshop-pickup-drop-statuses-table.yaml
+          file: db/changelog/changes/031-create-mechanic-holidays-table.yaml
   - include:
-      file: db/changelog/changes/032-create-workshop-payment-setups-table.yaml
+          file: db/changelog/changes/032-create-mechanic-daily-overrides-table.yaml
   - include:
-      file: db/changelog/changes/033-create-workshop-notification-preferences-table.yaml
-  - include:
-      file: db/changelog/changes/034-create-workshop-support-requests-table.yaml
-  - include:
-      file: db/changelog/changes/035-create-legal-documents-table.yaml
-  - include:
-      file: db/changelog/changes/036-create-workshop-legal-consents-table.yaml
+          file: db/changelog/changes/033-create-mechanic-settings-audit-logs-table.yaml

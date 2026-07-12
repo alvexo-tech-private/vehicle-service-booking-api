@@ -37,6 +37,15 @@ public class MechanicServiceSetting {
     private String serviceName;
 
     /**
+     * Service table category on the Home dashboard (Bike/Scooter General, Express, Repairs).
+     * Distinct from isExpressEligible, which governs express-queue booking eligibility.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false, length = 20)
+    @Builder.Default
+    private ServiceCategory category = ServiceCategory.GENERAL;
+
+    /**
      * How long this service takes in minutes.
      * Used to calculate remaining day capacity when reserveCapacity = true.
      */

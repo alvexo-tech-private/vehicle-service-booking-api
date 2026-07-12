@@ -71,6 +71,12 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     @Column(name = "service_type", nullable = false)
     private ServiceType serviceType;
+
+    /** ONLINE (customer app) / WALK_IN (recorded by mechanic) / RIDER_APP. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "channel", nullable = false, length = 20)
+    @Builder.Default
+    private BookingChannel channel = BookingChannel.ONLINE;
     
     @Column(columnDefinition = "TEXT", nullable = false)
     private String description;

@@ -1,0 +1,66 @@
+databaseChangeLog:
+  - changeSet:
+      id: 031-create-mechanic-holidays-table
+      author: system
+      comment: >
+        Creates mechanic_holidays — per-date Holiday/Pause markers that block
+        new bookings for that date (spec §7 Home "Holiday / Pause"). No
+        redistribution logic; existing bookings are left untouched.
+      changes:
+        - createTable:
+            tableName: mechanic_holidays
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: date
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reason
+                  type: VARCHAR(255)
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_holidays
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_holidays_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - addUniqueConstraint:
+            tableName: mechanic_holidays
+            columnNames: mechanic_id, date
+            constraintName: uq_mechanic_holidays_mechanic_date
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_holidays
