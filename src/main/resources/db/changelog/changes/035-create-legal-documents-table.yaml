@@ -1,0 +1,65 @@
+databaseChangeLog:
+  - changeSet:
+      id: 035-create-legal-documents-table
+      author: system
+      comment: Global legal document catalogue (Menu 15) — Terms, Privacy, Disclaimer.
+      changes:
+        - createTable:
+            tableName: legal_documents
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: document_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: version
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: url
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: legal_documents
+
+  - changeSet:
+      id: 035a-seed-legal-documents
+      author: system
+      comment: Seed initial legal document versions.
+      changes:
+        - insert:
+            tableName: legal_documents
+            columns:
+              - column: { name: document_type, value: TERMS }
+              - column: { name: version, value: "1.0" }
+              - column: { name: url, value: "https://alvexotech.com/legal/terms" }
+        - insert:
+            tableName: legal_documents
+            columns:
+              - column: { name: document_type, value: PRIVACY }
+              - column: { name: version, value: "1.0" }
+              - column: { name: url, value: "https://alvexotech.com/legal/privacy" }
+        - insert:
+            tableName: legal_documents
+            columns:
+              - column: { name: document_type, value: DISCLAIMER }
+              - column: { name: version, value: "1.0" }
+              - column: { name: url, value: "https://alvexotech.com/legal/disclaimer" }

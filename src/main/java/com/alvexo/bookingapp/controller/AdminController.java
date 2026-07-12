@@ -14,16 +14,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alvexo.bookingapp.dto.request.AdministratorRegisterRequest;
+import com.alvexo.bookingapp.dto.request.OnboardingDecisionRequest;
 import com.alvexo.bookingapp.dto.request.SalesRepresentativeRegisterRequest;
 import com.alvexo.bookingapp.dto.request.VehicleRequest;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.dto.response.VehicleResponse;
+import com.alvexo.bookingapp.dto.response.WorkshopOnboardingResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.AuthService;
 import com.alvexo.bookingapp.service.VehicleService;
+import com.alvexo.bookingapp.service.WorkshopProfileService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +46,9 @@ public class AdminController {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private WorkshopProfileService workshopProfileService;
 
     // -------------------------------------------------------------------------
     // User management — admin creates privileged users
@@ -119,5 +125,21 @@ public class AdminController {
         
         vehicleService.deleteVehicle(id, admin);
         return ResponseEntity.ok(MyApiResponse.success("Vehicle deleted successfully", null));
+    }
+
+    // -------------------------------------------------------------------------
+    // Workshop onboarding review
+    // -------------------------------------------------------------------------
+
+    @Operation(summary = "Record an onboarding decision",
+               description = "Approves, rejects, or requests more info on a workshop's submitted onboarding. "
+                       + "Transitions the workshop's overall status accordingly. Requires ADMINISTRATOR role.")
+    @PostMapping("/workshop-profile/{mechanicId}/onboarding/decision")
+    public ResponseEntity<MyApiResponse<WorkshopOnboardingResponse>> decideOnboarding(
+            @PathVariable Long mechanicId,
+            @Valid @RequestBody OnboardingDecisionRequest request) {
+        WorkshopOnboardingResponse response = workshopProfileService.recordOnboardingDecision(
+                mechanicId, request.getDecision(), request.getReason());
+        return ResponseEntity.ok(MyApiResponse.success("Onboarding decision recorded", response));
     }
 }
