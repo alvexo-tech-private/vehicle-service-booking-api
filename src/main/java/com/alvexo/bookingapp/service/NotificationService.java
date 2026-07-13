@@ -34,7 +34,7 @@ public class NotificationService {
     @Autowired
     private NotificationRepository notificationRepository;
     
-    @Autowired
+    @Autowired(required = false)
     private JavaMailSender mailSender;
     
     @Value("${app.toemail.address:info@alvexotech.com}")
@@ -75,6 +75,10 @@ public class NotificationService {
     }
     
     public void sendOtpEmailOld(String mobileNumber, String otp) {
+        if (mailSender == null) {
+            System.err.println("Mail sender not configured. Cannot send OTP email.");
+            return;
+        }
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmailAddress.split(","));
@@ -123,6 +127,10 @@ public class NotificationService {
      * ownership before the address is committed to the account.
      */
     public void sendEmailChangeOtp(String newEmail, String otp) {
+        if (mailSender == null) {
+            System.err.println("Mail sender not configured. Cannot send email change OTP.");
+            return;
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(newEmail);
         message.setSubject("Verify your new email address");
@@ -136,6 +144,10 @@ public class NotificationService {
      * authorise a mobile number change. (SMS delivery is not yet implemented.)
      */
     public void sendMobileChangeOtp(String currentEmail, String otp) {
+        if (mailSender == null) {
+            System.err.println("Mail sender not configured. Cannot send mobile change OTP.");
+            return;
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(currentEmail);
         message.setSubject("Verify your new mobile number");
@@ -149,6 +161,10 @@ public class NotificationService {
      * (SMS/WhatsApp delivery is not yet implemented — delivered via the owner's account email.)
      */
     public void sendWhatsappVerificationOtp(String accountEmail, String otp) {
+        if (mailSender == null) {
+            System.err.println("Mail sender not configured. Cannot send WhatsApp verification OTP.");
+            return;
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(accountEmail);
         message.setSubject("Verify your WhatsApp number");
