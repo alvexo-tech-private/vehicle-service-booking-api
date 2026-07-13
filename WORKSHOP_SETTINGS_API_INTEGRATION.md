@@ -19,6 +19,23 @@ are meaningful (`400`, `404`, `409`, `500`) — don't rely on `success` alone.
 
 ---
 
+## 0. Recently verified — three behavior fixes worth knowing about
+
+Everything below was smoke-tested against a live local instance (Postgres + all 33 Liquibase
+changesets applied) and run through the companion Postman collection
+(`postman/Workshop-Settings-API.postman_collection.json`) via Newman three consecutive times
+with **zero unexpected failures**. Three pre-existing behaviors changed as a result of that
+testing — nothing here changes a request/response shape, but each affects what your error
+handling should expect:
+
+| Before | Now | Where you'd notice it |
+|---|---|---|
+| Saving settings with an inline `serviceSettings` array could fail with a confusing `409` once any listed service had booking history. | The same save updates matching services in place and only removes ones no longer listed — safe to resend the full array repeatedly. | Settings screen "Save" button, §2 |
+| A malformed or empty path segment (e.g. a request built with a blank id) returned a bare HTML 500 page, not JSON. | Returns the standard `MyApiResponse` envelope with `404` and a `message`. | Any endpoint taking a path variable, if a client ever builds a request with a missing id |
+| N/A (new feature) | Settings audit log (§12) no longer logs phantom "changes" to decimal fields (e.g. `8.00` vs `8.0`) that are numerically identical. | Audit trail UI, if you build one against §12 |
+
+---
+
 ## 1. Level → API field mapping
 
 The mechanic-facing **Workshop Capacity Level (1–4)** is not sent directly. Derive

@@ -7,6 +7,7 @@ import com.alvexo.bookingapp.repository.MechanicSettingsAuditLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -29,7 +30,7 @@ public class MechanicSettingsAuditLogService {
     @Transactional
     public void logIfChanged(User mechanic, User changedBy, String entityType, String fieldName,
                               Object oldValue, Object newValue) {
-        if (Objects.equals(oldValue, newValue)) {
+        if (valuesEqual(oldValue, newValue)) {
             return;
         }
         auditLogRepository.save(MechanicSettingsAuditLog.builder()
@@ -54,6 +55,18 @@ public class MechanicSettingsAuditLogService {
                                                                      LocalDateTime from, LocalDateTime to) {
         return auditLogRepository.findByMechanicIdAndChangedAtBetweenOrderByChangedAtDesc(mechanicId, from, to)
                 .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * BigDecimal.equals() is scale-sensitive (8.00 != 8.0), which would log a
+     * false "change" every time a request-parsed value is compared against a
+     * DB-round-tripped one. Compare numerically for BigDecimal fields.
+     */
+    private boolean valuesEqual(Object oldValue, Object newValue) {
+        if (oldValue instanceof BigDecimal && newValue instanceof BigDecimal) {
+            return ((BigDecimal) oldValue).compareTo((BigDecimal) newValue) == 0;
+        }
+        return Objects.equals(oldValue, newValue);
     }
 
     private MechanicSettingsAuditLogResponse toResponse(MechanicSettingsAuditLog a) {

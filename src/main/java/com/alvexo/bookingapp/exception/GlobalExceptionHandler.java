@@ -14,6 +14,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 
@@ -128,6 +129,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<MyApiResponse<Void>> handleNotFound(NoHandlerFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(MyApiResponse.error("Resource not found: " + ex.getRequestURL()));
+    }
+
+    /**
+     * Spring Boot 3.2+ routes unmatched paths (e.g. a missing/blank @PathVariable
+     * segment like GET /api/bookings/) through the static-resource handler,
+     * which throws this instead of the classic NoHandlerFoundException.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<MyApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(MyApiResponse.error("Resource not found: " + ex.getResourcePath()));
     }
 
     @ExceptionHandler(Exception.class)

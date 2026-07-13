@@ -13,12 +13,14 @@ import com.alvexo.bookingapp.model.*;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSlotRepository;
 import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -276,15 +278,53 @@ public class MechanicSettingsService {
         return Boolean.TRUE.equals(reserveForSlots) ? WorkshopClassification.TYPE_4 : WorkshopClassification.TYPE_3;
     }
 
+    /**
+     * Replaces the mechanic's service catalogue with the requested rows.
+     * Matches existing rows by serviceName and updates them in place (rather
+     * than delete-all-then-insert) so a service that already has booking
+     * history keeps its id and the booking's FK stays valid. Rows removed
+     * from the request are hard-deleted when unreferenced, or soft-deleted
+     * (isActive=false) when a booking still points at them.
+     */
     private void replaceServiceSettings(User mechanic, List<MechanicServiceSettingRequest> requests) {
         List<MechanicServiceSetting> existing =
                 serviceSettingRepository.findByMechanicOrderByDisplayOrderAsc(mechanic);
-        serviceSettingRepository.deleteAll(existing);
 
-        List<MechanicServiceSetting> fresh = requests.stream()
-                .map(r -> buildServiceSetting(mechanic, r))
+        Map<String, MechanicServiceSetting> existingByName = existing.stream()
+                .collect(Collectors.toMap(MechanicServiceSetting::getServiceName, s -> s, (a, b) -> a));
+        Set<String> requestedNames = requests.stream()
+                .map(MechanicServiceSettingRequest::getServiceName)
+                .collect(Collectors.toSet());
+
+        List<MechanicServiceSetting> toSave = requests.stream()
+                .map(r -> {
+                    MechanicServiceSetting entity = existingByName.get(r.getServiceName());
+                    if (entity == null) {
+                        return buildServiceSetting(mechanic, r);
+                    }
+                    entity.setCategory(r.getCategory());
+                    entity.setDurationMinutes(r.getDurationMinutes());
+                    entity.setMaxSlotsPerDay(r.getMaxSlotsPerDay());
+                    entity.setIsExpressEligible(r.getIsExpressEligible() != null ? r.getIsExpressEligible() : false);
+                    entity.setIsActive(r.getIsActive() != null ? r.getIsActive() : true);
+                    entity.setDisplayOrder(r.getDisplayOrder() != null ? r.getDisplayOrder() : 0);
+                    return entity;
+                })
                 .collect(Collectors.toList());
-        serviceSettingRepository.saveAll(fresh);
+        serviceSettingRepository.saveAll(toSave);
+
+        List<MechanicServiceSetting> removed = existing.stream()
+                .filter(s -> !requestedNames.contains(s.getServiceName()))
+                .collect(Collectors.toList());
+        for (MechanicServiceSetting service : removed) {
+            try {
+                serviceSettingRepository.delete(service);
+                serviceSettingRepository.flush();
+            } catch (DataIntegrityViolationException e) {
+                service.setIsActive(false);
+                serviceSettingRepository.save(service);
+            }
+        }
     }
 
     private MechanicServiceSetting buildServiceSetting(User mechanic, MechanicServiceSettingRequest r) {
