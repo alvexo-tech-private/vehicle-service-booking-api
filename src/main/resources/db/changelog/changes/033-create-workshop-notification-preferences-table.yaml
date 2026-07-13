@@ -1,0 +1,86 @@
+databaseChangeLog:
+  - changeSet:
+      id: 033-create-workshop-notification-preferences-table
+      author: system
+      comment: Notifications (Menu 12) — booking toggles, channels, sound, one per workshop.
+      changes:
+        - createTable:
+            tableName: workshop_notification_preferences
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: new_booking_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: booking_cancelled_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: booking_rescheduled_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sound
+                  type: VARCHAR(10)
+                  defaultValue: DAY
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_notification_preferences
+            baseColumnNames: mechanic_id
+            constraintName: fk_wnp_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - createTable:
+            tableName: workshop_notification_channels
+            columns:
+              - column:
+                  name: preferences_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: channel
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_notification_channels
+            baseColumnNames: preferences_id
+            constraintName: fk_wnc_preferences
+            referencedTableName: workshop_notification_preferences
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+      rollback:
+        - dropTable:
+            tableName: workshop_notification_channels
+        - dropTable:
+            tableName: workshop_notification_preferences

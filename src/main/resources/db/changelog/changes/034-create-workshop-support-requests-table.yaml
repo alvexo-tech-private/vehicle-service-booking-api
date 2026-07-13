@@ -1,0 +1,82 @@
+databaseChangeLog:
+  - changeSet:
+      id: 034-create-workshop-support-requests-table
+      author: system
+      comment: Feedback & Support (Menu 14) — many per workshop.
+      changes:
+        - createTable:
+            tableName: workshop_support_requests
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reference_id
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: category
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: subject
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: image_file_id
+                  type: BIGINT
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: OPEN
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_support_requests
+            baseColumnNames: mechanic_id
+            constraintName: fk_wsr_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: workshop_support_requests
+            baseColumnNames: image_file_id
+            constraintName: fk_wsr_image_file
+            referencedTableName: stored_files
+            referencedColumnNames: id
+            onDelete: SET NULL
+            onUpdate: CASCADE
+        - createIndex:
+            indexName: idx_wsr_mechanic
+            tableName: workshop_support_requests
+            columns:
+              - column:
+                  name: mechanic_id
+      rollback:
+        - dropTable:
+            tableName: workshop_support_requests
