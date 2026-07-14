@@ -67,3 +67,6 @@ databaseChangeLog:
           file: db/changelog/changes/032-create-mechanic-daily-overrides-table.yaml
   - include:
           file: db/changelog/changes/033-create-mechanic-settings-audit-logs-table.yaml
+  # ── Service Desk feature ─────────────────────────────────────────────────────
+  - include:
+          file: db/changelog/changes/037-add-service-desk-fields-to-bookings.yaml
