@@ -44,6 +44,12 @@ public class Constants {
     // Workshop profile — platform verification
     public static final int PLATFORM_VERIFICATION_MIN_METHODS = 2;
 
+    // Service Desk — cancellation past the reschedule cutoff (SERVICE_DESK_API_SPEC.md §1.7, BR-22/30)
+    public static final java.math.BigDecimal SERVICE_RELIABILITY_ADJUSTMENT = new java.math.BigDecimal("30.00");
+    public static final String DEFAULT_CANCELLATION_MESSAGE =
+            "Due to unavoidable circumstances, your service has been cancelled. "
+            + "We are sorry for the inconvenience caused.";
+
     // Workshop profile — location
     public static final java.util.Set<String> INDIAN_STATES = java.util.Set.of(
             "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
