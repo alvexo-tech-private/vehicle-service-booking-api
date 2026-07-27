@@ -70,3 +70,5 @@ databaseChangeLog:
   # ── Service Desk feature ─────────────────────────────────────────────────────
   - include:
           file: db/changelog/changes/037-add-service-desk-fields-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/038-add-audio-reference-and-engine-oil-to-bookings.yaml

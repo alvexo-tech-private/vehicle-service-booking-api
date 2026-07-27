@@ -23,6 +23,7 @@ import com.alvexo.bookingapp.model.BookingChannel;
 import com.alvexo.bookingapp.model.BookingStatus;
 import com.alvexo.bookingapp.model.BookingType;
 import com.alvexo.bookingapp.model.DayOfWeek;
+import com.alvexo.bookingapp.model.JobCardType;
 import com.alvexo.bookingapp.model.MechanicAvailability;
 import com.alvexo.bookingapp.model.MechanicDailyOverride;
 import com.alvexo.bookingapp.model.MechanicServiceSetting;
@@ -95,6 +96,13 @@ public class BookingService {
      * Concurrency layers:
      *   Layer 1 (application): PESSIMISTIC_WRITE lock on conflicting bookings.
      *   Layer 2 (database):    unique constraint on (mechanic_id, scheduled_date_time).
+     *
+     * Rider → workshop routing (RIDER_BOOKING_TO_WORKSHOP.md §4.1):
+     *   Tagged channel = RIDER_APP. If the mechanic's jobCardType = AUTO, the
+     *   booking is auto-confirmed (and job-carded immediately when autoIssue =
+     *   true) so it surfaces on Service Desk Today/Service Week right away.
+     *   If jobCardType = MECHANIC (or settings aren't configured yet), it
+     *   lands PENDING in the Home dashboard Waiting List for manual approval.
      */
     @Transactional
     public BookingResponse createBooking(BookingRequest request, User vehicleUser) {
@@ -143,6 +151,16 @@ public class BookingService {
                 mechanic, serviceSetting, bookingDate, request.getScheduledDateTime(),
                 request.getAdvancePaid(), settingsOpt);
 
+        // 7b. Pickup / drop (RIDER_BOOKING_TO_WORKSHOP.md §3.2) — required addresses when requested
+        boolean pickupRequired = Boolean.TRUE.equals(request.getPickupRequired());
+        boolean dropRequired = Boolean.TRUE.equals(request.getDropRequired());
+        if (pickupRequired && isBlank(request.getPickupAddress())) {
+            throw new BadRequestException("pickupAddress is required when pickupRequired is true");
+        }
+        if (dropRequired && isBlank(request.getDeliveryAddress())) {
+            throw new BadRequestException("deliveryAddress is required when dropRequired is true");
+        }
+
         // 8. PESSIMISTIC LOCK — concurrency layer 1
         List<Booking> conflicts = bookingRepository.findAndLockConflicting(
                 mechanic, request.getScheduledDateTime());
@@ -151,7 +169,17 @@ public class BookingService {
                     "This slot is already booked. Please choose a different time.");
         }
 
-        // 9. Build and save — DB unique constraint is the final guard
+        // 9. Route by the mechanic's Job Card Type (RIDER_BOOKING_TO_WORKSHOP.md §4.1):
+        //    AUTO       -> auto-confirmed, job card issued immediately (subject to autoIssue).
+        //    MECHANIC   -> lands PENDING in the Waiting List for the workshop to approve.
+        //    No settings configured yet -> conservative default of PENDING.
+        boolean autoConfirm = settingsOpt.map(MechanicSettings::getJobCardType)
+                .map(type -> type == JobCardType.AUTO)
+                .orElse(false);
+        BookingStatus initialStatus = autoConfirm ? BookingStatus.CONFIRMED : BookingStatus.PENDING;
+        boolean autoIssue = settingsOpt.map(MechanicSettings::getAutoIssue).orElse(true);
+
+        // 10. Build and save — DB unique constraint is the final guard
         Booking booking = Booking.builder()
                 .vehicleUser(vehicleUser)
                 .mechanic(mechanic)
@@ -159,9 +187,9 @@ public class BookingService {
                 .serviceSetting(serviceSetting)
                 .bookingNumber(generateBookingNumber())
                 .scheduledDateTime(request.getScheduledDateTime())
-                .status(BookingStatus.PENDING)
+                .status(initialStatus)
                 .bookingType(bookingType)
-                .channel(BookingChannel.ONLINE)
+                .channel(BookingChannel.RIDER_APP)
                 .serviceType(request.getServiceType())
                 .description(request.getDescription())
                 .estimatedCost(request.getEstimatedCost())
@@ -172,7 +200,17 @@ public class BookingService {
                 .advancePaid(request.getAdvancePaid() != null
                         ? request.getAdvancePaid() : BigDecimal.ZERO)
                 .customerNotes(request.getCustomerNotes())
+                .pickupRequired(pickupRequired)
+                .pickupAddress(pickupRequired ? request.getPickupAddress() : null)
+                .dropRequired(dropRequired)
+                .deliveryAddress(dropRequired ? request.getDeliveryAddress() : null)
+                .audioReference(request.getAudioReference())
+                .engineOilReplacement(Boolean.TRUE.equals(request.getEngineOilReplacement()))
                 .build();
+
+        if (autoConfirm && autoIssue) {
+            booking.setJobCardNumber(generateJobCardNumber(booking));
+        }
 
         try {
             booking = bookingRepository.save(booking);
@@ -184,17 +222,23 @@ public class BookingService {
             throw e;
         }
 
-        // 10. Notify mechanic
+        // 11. Notify mechanic
         notificationService.createNotification(
                 mechanic,
-                "New Booking Request",
-                "You have a new " + bookingType.name().toLowerCase() +
-                " booking request from " + vehicleUser.getFirstName(),
+                autoConfirm ? "New Booking Confirmed" : "New Booking Request",
+                (autoConfirm ? "You have a new confirmed " : "You have a new ")
+                        + bookingType.name().toLowerCase()
+                        + (autoConfirm ? " booking from " : " booking request from ")
+                        + vehicleUser.getFirstName(),
                 NotificationType.BOOKING_CREATED,
                 "Booking",
                 booking.getId());
 
         return convertToResponse(booking);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     /**
@@ -427,18 +471,59 @@ public class BookingService {
     }
 
     /**
+     * Rider cancels their own booking (RIDER_BOOKING_TO_WORKSHOP.md §5:
+     * "Rider can create, modify, cancel..."). Mirrors the Service Desk
+     * cancel flow so the same row is visible as CANCELLED on both sides
+     * after refresh (§9 AC-7) — only the ownership check and the actor
+     * differ; mechanic-initiated cancellation stays on the Service Desk
+     * endpoints, which also flag the reliability adjustment.
+     */
+    @Transactional
+    public BookingResponse cancelBookingAsRider(Long bookingId, User rider, String reason) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getVehicleUser().getId().equals(rider.getId())) {
+            throw new BadRequestException("You don't have access to this booking");
+        }
+        if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.REJECTED
+                || booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new BadRequestException("A " + booking.getStatus() + " booking cannot be cancelled");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setServiceStage(null);
+        booking.setCancellationReason(reason);
+        booking.setCancelledAt(LocalDateTime.now());
+        booking.setCancelledBy(rider);
+        booking = bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getMechanic(),
+                "Booking Cancelled",
+                "Booking #" + booking.getBookingNumber() + " was cancelled by the customer: " + reason,
+                NotificationType.BOOKING_CANCELLED,
+                "Booking",
+                booking.getId());
+
+        return convertToResponse(booking);
+    }
+
+    /**
      * Reschedules a booking to a new date/time. Re-runs the same conflict
      * checks as booking creation; does not re-run capacity checks, since the
      * booking already holds a capacity slot for that day (rescheduling within
      * the same mechanic's calendar doesn't change total daily demand).
      */
     @Transactional
-    public BookingResponse rescheduleBooking(Long bookingId, LocalDateTime newScheduledDateTime, User mechanic) {
+    public BookingResponse rescheduleBooking(Long bookingId, LocalDateTime newScheduledDateTime, User actor) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
-            throw new BadRequestException("Only the assigned mechanic can reschedule this booking");
+        boolean actorIsMechanic = booking.getMechanic().getId().equals(actor.getId());
+        boolean actorIsRider = booking.getVehicleUser().getId().equals(actor.getId());
+        if (!actorIsMechanic && !actorIsRider) {
+            throw new BadRequestException("You don't have access to this booking");
         }
         if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.REJECTED
                 || booking.getStatus() == BookingStatus.COMPLETED) {
@@ -448,7 +533,7 @@ public class BookingService {
             throw new BadRequestException("Cannot reschedule to a past date/time");
         }
 
-        List<Booking> conflicts = bookingRepository.findAndLockConflicting(mechanic, newScheduledDateTime);
+        List<Booking> conflicts = bookingRepository.findAndLockConflicting(booking.getMechanic(), newScheduledDateTime);
         if (!conflicts.isEmpty()) {
             throw new BadRequestException("The requested time is already booked. Please choose a different time.");
         }
@@ -461,10 +546,13 @@ public class BookingService {
             throw new BadRequestException("This slot was just taken. Please choose another.");
         }
 
+        // Notify whichever side didn't initiate the change (RIDER_BOOKING_TO_WORKSHOP.md §5:
+        // rider can "modify"; a mechanic-initiated reschedule already existed).
+        User recipient = actorIsMechanic ? booking.getVehicleUser() : booking.getMechanic();
         notificationService.createNotification(
-                booking.getVehicleUser(),
+                recipient,
                 "Booking Rescheduled",
-                "Your booking #" + booking.getBookingNumber() + " has been rescheduled to " + newScheduledDateTime,
+                "Booking #" + booking.getBookingNumber() + " has been rescheduled to " + newScheduledDateTime,
                 NotificationType.GENERAL,
                 "Booking",
                 booking.getId());
@@ -603,6 +691,12 @@ public class BookingService {
                 .mechanicNotes(booking.getMechanicNotes())
                 .customerNotes(booking.getCustomerNotes())
                 .cancellationReason(booking.getCancellationReason())
+                .pickupRequired(booking.getPickupRequired())
+                .pickupAddress(booking.getPickupAddress())
+                .dropRequired(booking.getDropRequired())
+                .deliveryAddress(booking.getDeliveryAddress())
+                .audioReference(booking.getAudioReference())
+                .engineOilReplacement(booking.getEngineOilReplacement())
                 .completedAt(booking.getCompletedAt())
                 .createdAt(booking.getCreatedAt())
                 .build();

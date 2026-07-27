@@ -182,6 +182,18 @@ public class Booking {
     @Builder.Default
     private Boolean isCarryOver = false;
 
+    /**
+     * Reference to a rider-recorded voice note describing the problem
+     * (RIDER_BOOKING_TO_WORKSHOP.md §3.2) — uploaded out-of-band and stored
+     * here purely as a reference (e.g. a StoredFile id/filename), not a blob.
+     */
+    @Column(name = "audio_reference", length = 255)
+    private String audioReference;
+
+    @Column(name = "engine_oil_replacement", nullable = false)
+    @Builder.Default
+    private Boolean engineOilReplacement = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

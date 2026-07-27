@@ -51,6 +51,13 @@ public class BookingResponse {
     private String customerNotes;
     private String cancellationReason;
 
+    private Boolean pickupRequired;
+    private String pickupAddress;
+    private Boolean dropRequired;
+    private String deliveryAddress;
+    private String audioReference;
+    private Boolean engineOilReplacement;
+
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
 }
