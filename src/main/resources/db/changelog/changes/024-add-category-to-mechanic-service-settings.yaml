@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-add-category-to-mechanic-service-settings
+      author: system
+      comment: >
+        Adds the service table category (Bike/Scooter General, Express, Repairs)
+        used by the Home dashboard F/I/P columns. Existing rows default to
+        GENERAL; is_express_eligible remains the separate express-queue flag.
+      changes:
+        - addColumn:
+            tableName: mechanic_service_settings
+            columns:
+              - column:
+                  name: category
+                  type: VARCHAR(20)
+                  defaultValue: GENERAL
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropColumn:
+            tableName: mechanic_service_settings
+            columns:
+              - column:
+                  name: category

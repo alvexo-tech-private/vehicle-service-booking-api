@@ -44,3 +44,35 @@ databaseChangeLog:
           file: db/changelog/changes/021-seed-system-admin-user.yaml
   - include:
           file: db/changelog/changes/022-seed-vehicle-catalogue.yaml
+  # ── Workshop Settings / Home dashboard feature ───────────────────────────────
+  - include:
+          file: db/changelog/changes/023-add-classification-to-mechanic-settings.yaml
+  - include:
+          file: db/changelog/changes/024-add-category-to-mechanic-service-settings.yaml
+  - include:
+          file: db/changelog/changes/025-create-mechanic-service-slots-table.yaml
+  - include:
+          file: db/changelog/changes/026-add-auto-issue-to-mechanic-settings.yaml
+  - include:
+          file: db/changelog/changes/027-create-mechanic-configuration-settings-table.yaml
+  - include:
+          file: db/changelog/changes/028-create-mechanic-master-entries-table.yaml
+  - include:
+          file: db/changelog/changes/029-add-channel-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/030-create-mechanic-promotional-offers-table.yaml
+  - include:
+          file: db/changelog/changes/031-create-mechanic-holidays-table.yaml
+  - include:
+          file: db/changelog/changes/032-create-mechanic-daily-overrides-table.yaml
+  - include:
+          file: db/changelog/changes/033-create-mechanic-settings-audit-logs-table.yaml
+  # ── Service Desk feature ─────────────────────────────────────────────────────
+  - include:
+          file: db/changelog/changes/037-add-service-desk-fields-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/038-add-audio-reference-and-engine-oil-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/039-backfill-default-mechanic-availability.yaml
+  - include:
+          file: db/changelog/changes/040-create-settlements-tables.yaml

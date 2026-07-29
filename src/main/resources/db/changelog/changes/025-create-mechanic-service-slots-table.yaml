@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-create-mechanic-service-slots-table
+      author: system
+      comment: >
+        Creates mechanic_service_slots table — Slot 1 / Slot 2 configuration
+        for Workshop Capacity Level 4 (Mechanic Slot). One row per
+        (mechanic_id, slot_number). repair_qty is the "Veh. Qty" planned
+        capacity for that slot; enabled toggles whether the slot accepts bookings.
+      changes:
+        - createTable:
+            tableName: mechanic_service_slots
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              # 1 or 2 — enforced at the API layer
+              - column:
+                  name: slot_number
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: slot_time
+                  type: TIME
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: repair_qty
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_service_slots
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_service_slots_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - addUniqueConstraint:
+            tableName: mechanic_service_slots
+            columnNames: mechanic_id, slot_number
+            constraintName: uq_mechanic_service_slots_mechanic_slot
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_service_slots

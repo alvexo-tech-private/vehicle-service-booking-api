@@ -52,6 +52,22 @@ public class MechanicService {
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Rider-facing lookup by mechanic id (RIDER_BOOKING_BACKEND_REQUESTS.md
+     * §2) — the endpoints above are self-scoped from the JWT and can't answer
+     * "what are this workshop's hours" for anyone other than the mechanic
+     * themselves. Read-only; any authenticated user may call it.
+     */
+    @Transactional(readOnly = true)
+    public List<AvailabilityResponse> getMechanicAvailabilityById(Long mechanicId) {
+        User mechanic = userRepository.findById(mechanicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found"));
+        if (mechanic.getRole() != UserRole.MECHANIC) {
+            throw new BadRequestException("User is not a mechanic");
+        }
+        return getMechanicAvailability(mechanic);
+    }
     
     @Transactional
     public AvailabilityResponse updateAvailability(Long id, AvailabilityRequest request, User mechanic) {

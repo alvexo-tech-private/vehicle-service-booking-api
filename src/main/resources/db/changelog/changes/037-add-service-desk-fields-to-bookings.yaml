@@ -1,0 +1,113 @@
+databaseChangeLog:
+  - changeSet:
+      id: 037-add-service-desk-fields-to-bookings
+      author: system
+      comment: >
+        Adds the Service Desk fields (SERVICE_DESK_API_SPEC.md §0.1) to
+        bookings: pickup/drop flags + addresses + assigned junior mechanics,
+        delivery confirmation, carry-over flag, service-stage sub-status,
+        customer-facing cancellation message, and the ₹30 reliability
+        adjustment amount. Service Desk has no separate storage — it is a
+        set of read/write views over this table.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: service_stage
+                  type: VARCHAR(20)
+              - column:
+                  name: cancellation_message
+                  type: TEXT
+              - column:
+                  name: reliability_adjustment_amount
+                  type: DECIMAL(10,2)
+              - column:
+                  name: pickup_required
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: drop_required
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pickup_address
+                  type: TEXT
+              - column:
+                  name: delivery_address
+                  type: TEXT
+              - column:
+                  name: pickup_mechanic_id
+                  type: BIGINT
+              - column:
+                  name: drop_mechanic_id
+                  type: BIGINT
+              - column:
+                  name: delivered_by
+                  type: VARCHAR(100)
+              - column:
+                  name: delivered_on
+                  type: DATE
+              - column:
+                  name: is_carry_over
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: pickup_mechanic_id
+            constraintName: fk_bookings_pickup_mechanic
+            referencedTableName: mechanic_master_entries
+            referencedColumnNames: id
+            onDelete: SET NULL
+            onUpdate: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: drop_mechanic_id
+            constraintName: fk_bookings_drop_mechanic
+            referencedTableName: mechanic_master_entries
+            referencedColumnNames: id
+            onDelete: SET NULL
+            onUpdate: CASCADE
+
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_pickup_mechanic
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_drop_mechanic
+        - dropColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: service_stage
+              - column:
+                  name: cancellation_message
+              - column:
+                  name: reliability_adjustment_amount
+              - column:
+                  name: pickup_required
+              - column:
+                  name: drop_required
+              - column:
+                  name: pickup_address
+              - column:
+                  name: delivery_address
+              - column:
+                  name: pickup_mechanic_id
+              - column:
+                  name: drop_mechanic_id
+              - column:
+                  name: delivered_by
+              - column:
+                  name: delivered_on
+              - column:
+                  name: is_carry_over

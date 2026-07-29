@@ -15,17 +15,24 @@ import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.exception.UnauthorizedException;
+import com.alvexo.bookingapp.model.DayOfWeek;
+import com.alvexo.bookingapp.model.MechanicAvailability;
 import com.alvexo.bookingapp.model.RefreshToken;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
+import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
 import com.alvexo.bookingapp.repository.RefreshTokenRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.security.JwtTokenProvider;
 import com.alvexo.bookingapp.util.MobileNumberUtil;
 
+import java.time.LocalTime;
+import java.util.EnumSet;
+import java.util.List;
+
 @Service
 public class AuthService {
-    
+
 	private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,6 +41,7 @@ public class AuthService {
     private final ReferralService referralService;
     private final OtpService otpService;
     private final NotificationService notificationService;
+    private final MechanicAvailabilityRepository availabilityRepository;
 
     public AuthService(
             UserRepository userRepository,
@@ -43,7 +51,8 @@ public class AuthService {
             JwtTokenProvider tokenProvider,
             ReferralService referralService,
             OtpService otpService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            MechanicAvailabilityRepository availabilityRepository) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,6 +61,32 @@ public class AuthService {
         this.referralService = referralService;
         this.otpService = otpService;
         this.notificationService = notificationService;
+        this.availabilityRepository = availabilityRepository;
+    }
+
+    /**
+     * Default weekly hours seeded for every newly registered workshop so it's
+     * bookable immediately, rather than silently closed on every day until
+     * the mechanic manually opens each one (RIDER_BOOKING_BACKEND_REQUESTS.md
+     * §1 — "no availability row" was being read as permanently closed with no
+     * indication why). Monday–Saturday 09:00–18:00, Sunday closed; the
+     * mechanic can change any of this via the existing availability screens.
+     */
+    private static final LocalTime DEFAULT_START_TIME = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_END_TIME = LocalTime.of(18, 0);
+    private static final EnumSet<DayOfWeek> DEFAULT_CLOSED_DAYS = EnumSet.of(DayOfWeek.SUNDAY);
+
+    private void seedDefaultAvailability(User mechanic) {
+        List<MechanicAvailability> defaults = List.of(DayOfWeek.values()).stream()
+                .map(day -> MechanicAvailability.builder()
+                        .mechanic(mechanic)
+                        .dayOfWeek(day)
+                        .startTime(DEFAULT_START_TIME)
+                        .endTime(DEFAULT_END_TIME)
+                        .isAvailable(!DEFAULT_CLOSED_DAYS.contains(day))
+                        .build())
+                .toList();
+        availabilityRepository.saveAll(defaults);
     }
     
     @Transactional
@@ -349,6 +384,7 @@ public class AuthService {
                 .build();
 
         user = userRepository.save(user);
+        seedDefaultAvailability(user);
         return createTokenResponse(user);
     }
 
@@ -564,6 +600,44 @@ public class AuthService {
 
         user.setMobileNumber(normalizedMobile);
         userRepository.save(user);
+    }
+
+    /**
+     * Changes the account password for any authenticated user.
+     * Re-verifies the current password before accepting the new one and
+     * invalidates all refresh tokens so other devices must re-authenticate.
+     */
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BadRequestException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
+    }
+
+    /**
+     * Records an account-deletion request. The account is deactivated immediately;
+     * actual data erasure is handled by an out-of-band retention/erasure job.
+     */
+    @Transactional
+    public String requestAccountDeletion(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setActive(false);
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
+
+        return "DEL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private String generateUniqueReferralCode() {

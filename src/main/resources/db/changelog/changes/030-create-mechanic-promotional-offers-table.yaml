@@ -1,0 +1,99 @@
+databaseChangeLog:
+  - changeSet:
+      id: 030-create-mechanic-promotional-offers-table
+      author: system
+      comment: >
+        Creates mechanic_promotional_offers — Promotional Offers (spec §7 #76)
+        shown on the customer-facing Home dashboard.
+      changes:
+        - createTable:
+            tableName: mechanic_promotional_offers
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: title
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: description
+                  type: TEXT
+
+              - column:
+                  name: discount_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: discount_value
+                  type: DECIMAL(10,2)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: start_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: end_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_promotional_offers
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_promotional_offers_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_mechanic_promotional_offers_mechanic
+            tableName: mechanic_promotional_offers
+            columns:
+              - column:
+                  name: mechanic_id
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_promotional_offers

@@ -103,11 +103,29 @@ public class MechanicController {
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         mechanicService.deleteAvailability(id, mechanic);
         return ResponseEntity.ok(MyApiResponse.success("Availability deleted successfully", null));
     }
-    
+
+    // ── Availability lookup by id (any authenticated user) ─────────────────────
+
+    @Operation(
+        summary = "Get a mechanic's weekly availability by id",
+        description = "Read-only lookup so a rider can see a workshop's working days/hours before booking, " +
+                      "instead of guessing and getting a 400 on a closed day."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Weekly availability template (may be empty if never configured)"),
+        @ApiResponse(responseCode = "404", description = "No such mechanic")
+    })
+    @GetMapping("/{mechanicId}/availability")
+    public ResponseEntity<MyApiResponse<List<AvailabilityResponse>>> getAvailabilityByMechanicId(
+            @PathVariable Long mechanicId) {
+        List<AvailabilityResponse> availability = mechanicService.getMechanicAvailabilityById(mechanicId);
+        return ResponseEntity.ok(MyApiResponse.success(availability));
+    }
+
     // ── Weekly availability (one call for all days) ───────────────────────────
 
     @Operation(

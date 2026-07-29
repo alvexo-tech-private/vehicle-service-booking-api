@@ -1,5 +1,6 @@
 package com.alvexo.bookingapp.dto.request;
 
+import com.alvexo.bookingapp.model.ServiceCategory;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -9,6 +10,9 @@ public class MechanicServiceSettingRequest {
     @NotBlank(message = "serviceName is required")
     @Size(max = 100)
     private String serviceName;
+
+    @NotNull(message = "category is required")
+    private ServiceCategory category;
 
     @NotNull(message = "durationMinutes is required")
     @Min(value = 1, message = "durationMinutes must be at least 1")
