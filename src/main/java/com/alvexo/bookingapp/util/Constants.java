@@ -61,6 +61,13 @@ public class Constants {
             "Lakshadweep", "Puducherry"
     );
 
+    // Settlement (WORKSHOP_FINANCE_API_SPEC.md §2)
+    public static final java.math.BigDecimal SETTLEMENT_DAILY_ADJUSTMENT_CAP = new java.math.BigDecimal("200.00");
+    public static final java.math.BigDecimal SETTLEMENT_SUSPENSION_THRESHOLD = new java.math.BigDecimal("1000.00");
+    public static final int SETTLEMENT_CUSTOM_RANGE_MAX_DAYS = 7;
+    public static final int SETTLEMENT_CUSTOM_RANGE_LOOKBACK_DAYS = 30;
+    public static final int SETTLEMENT_LATEST_LOOKBACK_DAYS = 60;
+
     private Constants() {
         // Private constructor to prevent instantiation
     }

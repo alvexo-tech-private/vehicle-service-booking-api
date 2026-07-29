@@ -16,8 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alvexo.bookingapp.dto.request.AdministratorRegisterRequest;
 import com.alvexo.bookingapp.dto.request.OnboardingDecisionRequest;
 import com.alvexo.bookingapp.dto.request.SalesRepresentativeRegisterRequest;
+import com.alvexo.bookingapp.dto.request.SettlementStatusUpdateRequest;
 import com.alvexo.bookingapp.dto.request.VehicleRequest;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
+import com.alvexo.bookingapp.dto.response.SettlementResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.dto.response.VehicleResponse;
 import com.alvexo.bookingapp.dto.response.WorkshopOnboardingResponse;
@@ -25,6 +27,7 @@ import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.AuthService;
+import com.alvexo.bookingapp.service.SettlementService;
 import com.alvexo.bookingapp.service.VehicleService;
 import com.alvexo.bookingapp.service.WorkshopProfileService;
 
@@ -49,6 +52,9 @@ public class AdminController {
 
     @Autowired
     private WorkshopProfileService workshopProfileService;
+
+    @Autowired
+    private SettlementService settlementService;
 
     // -------------------------------------------------------------------------
     // User management — admin creates privileged users
@@ -141,5 +147,22 @@ public class AdminController {
         WorkshopOnboardingResponse response = workshopProfileService.recordOnboardingDecision(
                 mechanicId, request.getDecision(), request.getReason());
         return ResponseEntity.ok(MyApiResponse.success("Onboarding decision recorded", response));
+    }
+
+    // -------------------------------------------------------------------------
+    // Settlement status (WORKSHOP_FINANCE_API_SPEC.md — not part of the mobile
+    // spec; the app only reads settlements, but something has to be able to
+    // mark one Paid once a real bank transfer clears)
+    // -------------------------------------------------------------------------
+
+    @Operation(summary = "Transition a settlement's status",
+               description = "Moves a settlement Pending -> Processing -> Paid. All payment-transaction fields "
+                       + "are required when moving to Paid. Requires ADMINISTRATOR role.")
+    @PutMapping("/settlements/{id}/status")
+    public ResponseEntity<MyApiResponse<SettlementResponse>> updateSettlementStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody SettlementStatusUpdateRequest request) {
+        SettlementResponse response = settlementService.updateStatus(id, request);
+        return ResponseEntity.ok(MyApiResponse.success("Settlement status updated", response));
     }
 }

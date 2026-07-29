@@ -74,3 +74,5 @@ databaseChangeLog:
           file: db/changelog/changes/038-add-audio-reference-and-engine-oil-to-bookings.yaml
   - include:
           file: db/changelog/changes/039-backfill-default-mechanic-availability.yaml
+  - include:
+          file: db/changelog/changes/040-create-settlements-tables.yaml
