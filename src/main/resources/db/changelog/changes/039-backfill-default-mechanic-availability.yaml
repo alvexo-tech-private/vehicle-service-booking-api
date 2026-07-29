@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: 039-backfill-default-mechanic-availability
+      author: system
+      comment: >
+        Backfills Monday-Saturday 09:00-18:00 (Sunday closed) availability
+        rows for every existing MECHANIC user who has zero mechanic_availability
+        rows. RIDER_BOOKING_BACKEND_REQUESTS.md §1: "no row for a weekday" is
+        read as closed, and no registration flow ever created these rows, so
+        every workshop that registered before this change is unbookable on
+        every single day with no indication why. Mirrors the default now
+        applied at registration time (AuthService.seedDefaultAvailability) so
+        existing and new workshops behave the same way. Mechanics can still
+        edit/close any day via the existing availability screens.
+      changes:
+        - sql:
+            sql: >
+              INSERT INTO mechanic_availability
+                (mechanic_id, day_of_week, start_time, end_time, is_available,
+                 slot_duration_minutes, max_slots_per_day, break_windows, created_at, updated_at)
+              SELECT u.id, d.day_of_week, '09:00:00'::time, '18:00:00'::time,
+                     (d.day_of_week <> 'SUNDAY'), 60, 10, '[]'::jsonb, now(), now()
+              FROM users u
+              CROSS JOIN (VALUES ('MONDAY'), ('TUESDAY'), ('WEDNESDAY'), ('THURSDAY'),
+                                  ('FRIDAY'), ('SATURDAY'), ('SUNDAY')) AS d(day_of_week)
+              WHERE u.role = 'MECHANIC'
+                AND NOT EXISTS (
+                  SELECT 1 FROM mechanic_availability ma WHERE ma.mechanic_id = u.id
+                );
+      rollback:
+        - sql:
+            sql: >
+              -- Intentionally a no-op: rows backfilled here are indistinguishable
+              -- from rows a mechanic may have since created/edited manually, so
+              -- a blind rollback risks deleting real configuration. Roll back by
+              -- restoring from a pre-migration backup if truly needed.
+              SELECT 1;
