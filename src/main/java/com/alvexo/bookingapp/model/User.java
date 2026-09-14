@@ -127,6 +127,13 @@ public class User {
     @Builder.Default
     private BigDecimal totalBonusEarned = BigDecimal.ZERO;
     
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean deleted = false;
+    
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+    
     // Relationships
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

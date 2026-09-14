@@ -76,3 +76,6 @@ databaseChangeLog:
           file: db/changelog/changes/039-backfill-default-mechanic-availability.yaml
   - include:
           file: db/changelog/changes/040-create-settlements-tables.yaml
+  # ── Admin Portal soft-delete support ─────────────────────────────────────────
+  - include:
+          file: db/changelog/changes/041-add-deleted-flag-to-users.yaml

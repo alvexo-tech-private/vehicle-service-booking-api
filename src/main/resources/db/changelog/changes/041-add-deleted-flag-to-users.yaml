@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 041-add-deleted-flag-to-users
+      author: system
+      comment: >
+        Adds a soft-delete flag to users — riders/workshops removed via the
+        Admin Portal's account lifecycle actions are marked deleted rather
+        than hard-deleted, so historical booking/finance/audit data referencing
+        them stays intact.
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: deleted
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+      rollback:
+        - dropColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: deleted
+              - column:
+                  name: deleted_at
