@@ -10,8 +10,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.alvexo.bookingapp.dto.request.ChangePasswordRequest;
 import com.alvexo.bookingapp.dto.request.ChangePinRequest;
 import com.alvexo.bookingapp.dto.request.UserUpdateRequest;
+import com.alvexo.bookingapp.dto.response.DeleteAccountResponse;
 import com.alvexo.bookingapp.dto.response.MechanicSearchResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
@@ -75,7 +77,16 @@ public class UserController {
         if (request.getLatitude() != null) user.setLatitude(request.getLatitude());
         if (request.getLongitude() != null) user.setLongitude(request.getLongitude());
         if (request.getBio() != null) user.setBio(request.getBio());
-        
+        if (request.getDisplayName() != null) user.setDisplayName(request.getDisplayName());
+        if (request.getNotificationsEnabled() != null) user.setNotificationsEnabled(request.getNotificationsEnabled());
+        if (request.getWhatsappNotificationsEnabled() != null) user.setWhatsappNotificationsEnabled(request.getWhatsappNotificationsEnabled());
+
+        // Subordination rule: WhatsApp notifications can only be on while Promotion
+        // Notification is on (RIDER_PROFILE spec §3).
+        if (!Boolean.TRUE.equals(user.getNotificationsEnabled())) {
+            user.setWhatsappNotificationsEnabled(false);
+        }
+
         user = userRepository.save(user);
         
         UserResponse response = convertToResponse(user);
@@ -105,6 +116,31 @@ public class UserController {
         authService.changePin(authentication.getName(), request);
         return ResponseEntity.ok(
                 MyApiResponse.success("PIN changed successfully. Please log in again on all devices.", null));
+    }
+
+    // -------------------------------------------------------------------------
+    // Password & account lifecycle — works for all 4 user types
+    // -------------------------------------------------------------------------
+
+    @Operation(summary = "Change password", description = "Changes the account password. Requires the current password for verification. Invalidates all refresh tokens — forces re-login on all devices.")
+    @PostMapping("/change-password")
+    public ResponseEntity<MyApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+        authService.changePassword(authentication.getName(), request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.ok(
+                MyApiResponse.success("Password changed successfully. Please log in again on all devices.", null));
+    }
+
+    @Operation(summary = "Request account deletion", description = "Deactivates the account immediately and queues it for erasure. Returns a tracking request ID.")
+    @DeleteMapping("/me")
+    public ResponseEntity<MyApiResponse<DeleteAccountResponse>> requestAccountDeletion(Authentication authentication) {
+        String requestId = authService.requestAccountDeletion(authentication.getName());
+        DeleteAccountResponse response = DeleteAccountResponse.builder()
+                .requestId(requestId)
+                .status("pending_deletion")
+                .build();
+        return ResponseEntity.ok(MyApiResponse.success("Account deletion requested", response));
     }
 
     // -------------------------------------------------------------------------
@@ -201,6 +237,11 @@ public class UserController {
                 .totalReferrals(user.getTotalReferrals())
                 .totalBonusEarned(user.getTotalBonusEarned())
                 .createdAt(user.getCreatedAt())
+                .displayName(user.getDisplayName() != null && !user.getDisplayName().isBlank()
+                        ? user.getDisplayName()
+                        : user.getFirstName())
+                .notificationsEnabled(user.getNotificationsEnabled())
+                .whatsappNotificationsEnabled(user.getWhatsappNotificationsEnabled())
                 .build();
     }
 }

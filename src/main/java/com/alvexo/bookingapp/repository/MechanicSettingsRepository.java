@@ -15,4 +15,6 @@ public interface MechanicSettingsRepository extends JpaRepository<MechanicSettin
     Optional<MechanicSettings> findByMechanicId(Long mechanicId);
 
     boolean existsByMechanic(User mechanic);
+
+    boolean existsByMechanicId(Long mechanicId);
 }

@@ -25,12 +25,15 @@ import com.alvexo.bookingapp.dto.request.WeeklyAvailabilityRequest;
 import com.alvexo.bookingapp.dto.response.AvailabilityResponse;
 import com.alvexo.bookingapp.dto.response.MechanicSearchResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
+import com.alvexo.bookingapp.dto.response.ServiceEligibilityEntryResponse;
+import com.alvexo.bookingapp.dto.response.ServiceEligibilityResponse;
 import com.alvexo.bookingapp.dto.response.SlotResponse;
 import com.alvexo.bookingapp.dto.response.UserResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.MechanicService;
+import com.alvexo.bookingapp.service.WorkshopServiceEligibilityService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,10 +48,13 @@ import jakarta.validation.Valid;
 public class MechanicController {
 
 	@Autowired
-	private MechanicService mechanicService;   
-	
+	private MechanicService mechanicService;
+
 	@Autowired
 	private UserRepository userRepository;
+
+	@Autowired
+	private WorkshopServiceEligibilityService eligibilityService;
     
     // ── Availability template management (mechanic only) ──────────────────────
 
@@ -103,11 +109,41 @@ public class MechanicController {
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         mechanicService.deleteAvailability(id, mechanic);
         return ResponseEntity.ok(MyApiResponse.success("Availability deleted successfully", null));
     }
-    
+
+    // ── Availability lookup by id (any authenticated user) ─────────────────────
+
+    @Operation(
+        summary = "Get a mechanic's weekly availability by id",
+        description = "Read-only lookup so a rider can see a workshop's working days/hours before booking, " +
+                      "instead of guessing and getting a 400 on a closed day."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Weekly availability template (may be empty if never configured)"),
+        @ApiResponse(responseCode = "404", description = "No such mechanic")
+    })
+    @GetMapping("/{mechanicId}/availability")
+    public ResponseEntity<MyApiResponse<List<AvailabilityResponse>>> getAvailabilityByMechanicId(
+            @PathVariable Long mechanicId) {
+        List<AvailabilityResponse> availability = mechanicService.getMechanicAvailabilityById(mechanicId);
+        return ResponseEntity.ok(MyApiResponse.success(availability));
+    }
+
+    @Operation(
+        summary = "Get a mechanic's service eligibility by id",
+        description = "Read-only lookup of which vehicle makes/categories a workshop services, " +
+                      "for rider-side previews before booking."
+    )
+    @GetMapping("/{mechanicId}/service-eligibility")
+    public ResponseEntity<MyApiResponse<ServiceEligibilityResponse>> getServiceEligibilityByMechanicId(
+            @PathVariable Long mechanicId) {
+        List<ServiceEligibilityEntryResponse> entries = eligibilityService.getEligibility(mechanicId);
+        return ResponseEntity.ok(MyApiResponse.success(new ServiceEligibilityResponse(entries)));
+    }
+
     // ── Weekly availability (one call for all days) ───────────────────────────
 
     @Operation(
@@ -242,10 +278,16 @@ public class MechanicController {
             @RequestParam(required = false) String mobile,
 
             @Parameter(description = "Exact postal / PIN code of the mechanic's workshop", example = "600040")
-            @RequestParam(required = false) String pinCode) {
+            @RequestParam(required = false) String pinCode,
+
+            @Parameter(description = "Rider's vehicle make — when provided, each result gets isBrandSupported/supportedBrands computed against it", example = "Honda")
+            @RequestParam(required = false) String vehicleMake,
+
+            @Parameter(description = "Rider's vehicle fuel type — narrows the brand-support check together with vehicleMake", example = "PETROL")
+            @RequestParam(required = false) com.alvexo.bookingapp.model.FuelType fuelType) {
 
         List<MechanicSearchResponse> mechanics =
-                mechanicService.searchMechanics(area, mobile, pinCode);
+                mechanicService.searchMechanics(area, mobile, pinCode, vehicleMake, fuelType);
 
         String searchLabel = resolveSearchLabel(area, mobile, pinCode);
         String message = mechanics.isEmpty()

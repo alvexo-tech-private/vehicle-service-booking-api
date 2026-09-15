@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: 045-add-proposal-fields-to-bookings
+      author: system
+      comment: >
+        Alternate Date Proposal flow (RIDER_BOOKING_COLLABORATION spec §3 Seam 5) —
+        workshop proposes a new date, rider accepts/declines before scheduledDateTime moves.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: proposed_date_time
+                  type: TIMESTAMP
+              - column:
+                  name: proposal_status
+                  type: VARCHAR(20)
+                  defaultValue: NONE
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: proposed_date_time
+              - column:
+                  name: proposal_status

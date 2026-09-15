@@ -1,0 +1,143 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-create-mechanic-configuration-settings-table
+      author: system
+      comment: >
+        Creates mechanic_configuration_settings — the "Configuration Settings"
+        section of Workshop Settings (job-card-number format, reschedule
+        policy, pickup/drop, auto-confirm-other-state, repairs-require-advance,
+        service reminder intervals). One row per mechanic, created on first save.
+      changes:
+        - createTable:
+            tableName: mechanic_configuration_settings
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+
+              - column:
+                  name: job_card_number_starting_sequence
+                  type: VARCHAR(20)
+                  defaultValue: '0001'
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: job_card_number_format
+                  type: VARCHAR(20)
+                  defaultValue: NUMERIC
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: job_card_number_reset_frequency
+                  type: VARCHAR(20)
+                  defaultValue: WEEKLY
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: job_card_number_prefix
+                  type: VARCHAR(4)
+
+              - column:
+                  name: job_card_number_suffix
+                  type: VARCHAR(4)
+
+              - column:
+                  name: reschedule_limit
+                  type: INT
+                  defaultValueNumeric: 2
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reschedule_cutoff_time
+                  type: TIME
+                  defaultValue: '10:00:00'
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: pickup_drop_facility_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: auto_confirm_other_state
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: repairs_require_advance
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: service_due_interval_days
+                  type: INT
+                  defaultValueNumeric: 90
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: second_reminder_interval_days
+                  type: INT
+                  defaultValueNumeric: 15
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reminder_changes_this_year
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reminder_changes_year
+                  type: INT
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_configuration_settings
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_configuration_settings_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_configuration_settings

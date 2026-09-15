@@ -1,0 +1,64 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-add-classification-to-mechanic-settings
+      author: system
+      comment: >
+        Adds Workshop Capacity Level support to mechanic_settings.
+        job_card_type (AUTO/MECHANIC) + reserve_for_slots together with the
+        existing reserve_capacity flag determine the derived classification
+        (TYPE_1..TYPE_4). auto_allocation_* mirrors the existing
+        reserve_capacity/full_day_capacity_hours pair for the
+        Open Booking / Auto-Allocation feature.
+        Existing rows default to TYPE_1 (AUTO, reserveCapacity=false) since
+        that was the only mode supported before this change.
+      changes:
+        - addColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: job_card_type
+                  type: VARCHAR(20)
+                  defaultValue: AUTO
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: reserve_for_slots
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: classification
+                  type: VARCHAR(20)
+                  defaultValue: TYPE_1
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: auto_allocation_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              # Required when auto_allocation_enabled = true (min 0.5, enforced at API layer)
+              - column:
+                  name: auto_allocation_capacity_hours
+                  type: DECIMAL(5,2)
+
+      rollback:
+        - dropColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: job_card_type
+              - column:
+                  name: reserve_for_slots
+              - column:
+                  name: classification
+              - column:
+                  name: auto_allocation_enabled
+              - column:
+                  name: auto_allocation_capacity_hours

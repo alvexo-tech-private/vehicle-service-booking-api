@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 038-add-audio-reference-and-engine-oil-to-bookings
+      author: system
+      comment: >
+        Adds the remaining Service Details fields from
+        RIDER_BOOKING_TO_WORKSHOP.md §3.2 that weren't folded in with the
+        pickup/drop columns: a reference to a rider-recorded voice note
+        (uploaded out-of-band, e.g. via the file storage endpoint, and
+        referenced here by name/id) and the engine-oil-replacement flag.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: audio_reference
+                  type: VARCHAR(255)
+              - column:
+                  name: engine_oil_replacement
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: audio_reference
+              - column:
+                  name: engine_oil_replacement

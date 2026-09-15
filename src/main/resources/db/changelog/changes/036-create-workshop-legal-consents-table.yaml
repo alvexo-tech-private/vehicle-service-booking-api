@@ -1,0 +1,54 @@
+databaseChangeLog:
+  - changeSet:
+      id: 036-create-workshop-legal-consents-table
+      author: system
+      comment: Consent history (Menu 15) — many per workshop.
+      changes:
+        - createTable:
+            tableName: workshop_legal_consents
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: document_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: accepted_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_legal_consents
+            baseColumnNames: mechanic_id
+            constraintName: fk_wlc_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - createIndex:
+            indexName: idx_wlc_mechanic
+            tableName: workshop_legal_consents
+            columns:
+              - column:
+                  name: mechanic_id
+      rollback:
+        - dropTable:
+            tableName: workshop_legal_consents

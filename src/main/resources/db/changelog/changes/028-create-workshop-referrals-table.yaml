@@ -1,0 +1,54 @@
+databaseChangeLog:
+  - changeSet:
+      id: 028-create-workshop-referrals-table
+      author: system
+      comment: The referral code a workshop has applied (Menu 6) — one per workshop.
+      changes:
+        - createTable:
+            tableName: workshop_referrals
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: code
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: partner_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: benefit
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: applied_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_referrals
+            baseColumnNames: mechanic_id
+            constraintName: fk_workshop_referrals_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+      rollback:
+        - dropTable:
+            tableName: workshop_referrals

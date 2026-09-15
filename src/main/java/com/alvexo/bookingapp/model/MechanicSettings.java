@@ -10,6 +10,7 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Table(name = "mechanic_settings")
@@ -45,6 +46,32 @@ public class MechanicSettings {
     @Column(name = "reserve_capacity", nullable = false)
     @Builder.Default
     private Boolean reserveCapacity = false;
+
+    /**
+     * Internal job-card generation mode behind the mechanic-facing
+     * Workshop Capacity Level (1-4). AUTO -> Level 1/2, MECHANIC -> Level 3/4.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_card_type", nullable = false, length = 20)
+    @Builder.Default
+    private JobCardType jobCardType = JobCardType.AUTO;
+
+    /**
+     * Only meaningful when jobCardType = MECHANIC.
+     * false -> Level 3 (Mechanic Day), true -> Level 4 (Mechanic Slot).
+     */
+    @Column(name = "reserve_for_slots", nullable = false)
+    @Builder.Default
+    private Boolean reserveForSlots = false;
+
+    /**
+     * Derived from (jobCardType, reserveCapacity, reserveForSlots) and persisted
+     * for convenience — drives which Home dashboard layout the mobile app renders.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "classification", nullable = false, length = 20)
+    @Builder.Default
+    private WorkshopClassification classification = WorkshopClassification.TYPE_1;
 
     /**
      * Total working capacity in hours per day.
@@ -90,6 +117,28 @@ public class MechanicSettings {
     private BigDecimal advanceAmount;
 
     /**
+     * Open Booking / Auto-Allocation toggle — lets bookings be auto-assigned
+     * up to autoAllocationCapacityHours worth of work per day.
+     */
+    @Column(name = "auto_allocation_enabled", nullable = false)
+    @Builder.Default
+    private Boolean autoAllocationEnabled = false;
+
+    /**
+     * Required when autoAllocationEnabled = true (min 0.5, enforced at API layer).
+     */
+    @Column(name = "auto_allocation_capacity_hours", precision = 5, scale = 2)
+    private BigDecimal autoAllocationCapacityHours;
+
+    /**
+     * Whether job cards are issued automatically on booking confirmation
+     * (true) or require an explicit mechanic action (false).
+     */
+    @Column(name = "auto_issue", nullable = false)
+    @Builder.Default
+    private Boolean autoIssue = true;
+
+    /**
      * JSON array of service configurations offered by this mechanic.
      * Stored as JSONB — purely config, never FK-referenced.
      * Structure: [{"serviceName":"...", "durationMinutes":60, "isExpressEligible":true, ...}]
@@ -97,6 +146,19 @@ public class MechanicSettings {
     @Column(name = "preferences", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private String preferences;
+
+    /**
+     * Auto vs Mechanic assignment per service type
+     * (WORKSHOP_API_AUDIT_AND_BACKEND_SPECIFICATION.md §1.2).
+     */
+    @Column(name = "service_allocations", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<ServiceAllocationEntry> serviceAllocations;
+
+    /** "Allow General bookings to use Express hours when spare capacity exists" toggle. */
+    @Column(name = "allow_general_use_express_hours", nullable = false)
+    @Builder.Default
+    private Boolean allowGeneralUseExpressHours = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

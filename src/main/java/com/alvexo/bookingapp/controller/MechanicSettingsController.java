@@ -1,25 +1,31 @@
 package com.alvexo.bookingapp.controller;
 
 import com.alvexo.bookingapp.dto.request.MechanicServiceSettingRequest;
+import com.alvexo.bookingapp.dto.request.MechanicServiceSlotsRequest;
 import com.alvexo.bookingapp.dto.request.MechanicSettingsRequest;
 import com.alvexo.bookingapp.dto.response.MechanicServiceSettingResponse;
+import com.alvexo.bookingapp.dto.response.MechanicServiceSlotResponse;
+import com.alvexo.bookingapp.dto.response.MechanicSettingsAuditLogResponse;
 import com.alvexo.bookingapp.dto.response.MechanicSettingsResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
+import com.alvexo.bookingapp.service.MechanicSettingsAuditLogService;
 import com.alvexo.bookingapp.service.MechanicSettingsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Tag(name = "Mechanic Settings",
@@ -29,11 +35,14 @@ import java.util.List;
 public class MechanicSettingsController {
 
     private final MechanicSettingsService settingsService;
+    private final MechanicSettingsAuditLogService auditLogService;
     private final UserRepository userRepository;
 
     public MechanicSettingsController(MechanicSettingsService settingsService,
+                                      MechanicSettingsAuditLogService auditLogService,
                                       UserRepository userRepository) {
         this.settingsService = settingsService;
+        this.auditLogService = auditLogService;
         this.userRepository = userRepository;
     }
 
@@ -151,6 +160,66 @@ public class MechanicSettingsController {
 
         return ResponseEntity.ok(MyApiResponse.success(
                 settingsService.getActiveServiceSettings(mechanicId)));
+    }
+
+    // ── Service slots (Slot 1 / Slot 2 — Level 4) ──────────────────────────────
+
+    @Operation(
+        summary = "Save service slots (create or update)",
+        description = """
+            Upserts Slot 1 / Slot 2 configuration by slotNumber. Only meaningful
+            for Workshop Capacity Level 4 (Mechanic Slot), but stored regardless
+            of the mechanic's current Level. Mechanic settings must already exist.
+            """
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Slots saved"),
+        @ApiResponse(responseCode = "400", description = "Validation failed or settings not yet created")
+    })
+    @RequestMapping(value = "/service-slots", method = {RequestMethod.POST, RequestMethod.PUT})
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<List<MechanicServiceSlotResponse>>> saveServiceSlots(
+            @Valid @RequestBody MechanicServiceSlotsRequest request,
+            Authentication authentication) {
+
+        User mechanic = resolveUser(authentication);
+        List<MechanicServiceSlotResponse> response = settingsService.saveServiceSlots(mechanic, request);
+        return ResponseEntity.ok(MyApiResponse.success("Service slots saved successfully", response));
+    }
+
+    @Operation(summary = "Get service slots for a mechanic",
+               description = "Returns Slot 1 / Slot 2 configuration, ordered by slotNumber.")
+    @GetMapping("/{mechanicId}/service-slots")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<MyApiResponse<List<MechanicServiceSlotResponse>>> getServiceSlots(
+            @PathVariable Long mechanicId) {
+
+        return ResponseEntity.ok(MyApiResponse.success(
+                settingsService.getServiceSlots(mechanicId)));
+    }
+
+    // ── Settings audit ──────────────────────────────────────────────────────
+
+    @Operation(summary = "Recent settings changes",
+               description = "Last 50 field-level changes to this mechanic's settings/configuration (spec §7 Settings Audit).")
+    @GetMapping("/audit")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<List<MechanicSettingsAuditLogResponse>>> getRecentAudit(
+            Authentication authentication) {
+        User mechanic = resolveUser(authentication);
+        return ResponseEntity.ok(MyApiResponse.success(auditLogService.getRecentChanges(mechanic.getId())));
+    }
+
+    @Operation(summary = "Settings changes in a date range")
+    @GetMapping("/audit/range")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<List<MechanicSettingsAuditLogResponse>>> getAuditInRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            Authentication authentication) {
+        User mechanic = resolveUser(authentication);
+        return ResponseEntity.ok(MyApiResponse.success(
+                auditLogService.getChangesInRange(mechanic.getId(), from, to)));
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

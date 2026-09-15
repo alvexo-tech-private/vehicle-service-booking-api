@@ -32,6 +32,7 @@ public class MechanicService {
     @Autowired private MechanicAvailabilityRepository availabilityRepository;
     @Autowired private BookingRepository bookingRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private WorkshopServiceEligibilityService eligibilityService;
 
     // ── Single-day availability ───────────────────────────────────────────────
 
@@ -51,6 +52,22 @@ public class MechanicService {
         return availabilityRepository.findByMechanic(mechanic).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Rider-facing lookup by mechanic id (RIDER_BOOKING_BACKEND_REQUESTS.md
+     * §2) — the endpoints above are self-scoped from the JWT and can't answer
+     * "what are this workshop's hours" for anyone other than the mechanic
+     * themselves. Read-only; any authenticated user may call it.
+     */
+    @Transactional(readOnly = true)
+    public List<AvailabilityResponse> getMechanicAvailabilityById(Long mechanicId) {
+        User mechanic = userRepository.findById(mechanicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found"));
+        if (mechanic.getRole() != UserRole.MECHANIC) {
+            throw new BadRequestException("User is not a mechanic");
+        }
+        return getMechanicAvailability(mechanic);
     }
     
     @Transactional
@@ -332,6 +349,18 @@ public class MechanicService {
     @Transactional(readOnly = true)
     public List<MechanicSearchResponse> searchMechanics(
             String area, String mobileNumber, String pinCode) {
+        return searchMechanics(area, mobileNumber, pinCode, null, null);
+    }
+
+    /**
+     * Overload that additionally computes brand-support fields relative to
+     * {@code vehicleMake}/{@code fuelType} (RIDER_BOOKING_COLLABORATION spec §3 Seam 1).
+     * These two params are layered on top of the existing exactly-one-of
+     * (area, mobile, pinCode) dimension rather than counted against it.
+     */
+    @Transactional(readOnly = true)
+    public List<MechanicSearchResponse> searchMechanics(
+            String area, String mobileNumber, String pinCode, String vehicleMake, FuelType fuelType) {
 
         boolean hasArea    = area != null && !area.isBlank();
         boolean hasMobile  = mobileNumber != null && !mobileNumber.isBlank();
@@ -363,12 +392,18 @@ public class MechanicService {
             results = List.of();
         }
 
+        boolean hasVehicleMake = vehicleMake != null && !vehicleMake.isBlank();
         return results.stream()
-                .map(this::convertToMechanicSearchResponse)
+                .map(user -> convertToMechanicSearchResponse(user, hasVehicleMake ? vehicleMake.trim() : null, fuelType))
                 .collect(Collectors.toList());
     }
-    
-    private MechanicSearchResponse convertToMechanicSearchResponse(User user) {
+
+    private MechanicSearchResponse convertToMechanicSearchResponse(User user, String vehicleMake, FuelType fuelType) {
+        List<String> supportedBrands = eligibilityService.getSupportedBrands(user.getId());
+        Boolean isBrandSupported = vehicleMake != null
+                ? eligibilityService.isBrandSupported(user.getId(), vehicleMake, fuelType)
+                : null;
+
         return new MechanicSearchResponse(
                 user.getId(),
                 user.getFirstName(),
@@ -387,7 +422,9 @@ public class MechanicService {
                 user.getTotalBookingsCompleted(),
                 user.getBio(),
                 user.getLatitude(),
-                user.getLongitude()
+                user.getLongitude(),
+                supportedBrands,
+                isBrandSupported
         );
     }
 }

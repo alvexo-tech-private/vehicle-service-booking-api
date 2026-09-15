@@ -1,5 +1,8 @@
 package com.alvexo.bookingapp.dto.response;
 
+import com.alvexo.bookingapp.model.JobCardType;
+import com.alvexo.bookingapp.model.ServiceAllocationEntry;
+import com.alvexo.bookingapp.model.WorkshopClassification;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -17,8 +20,12 @@ public class MechanicSettingsResponse {
     private Long mechanicId;
     private String mechanicName;
 
+    private JobCardType jobCardType;
+    private WorkshopClassification classification;
+
     private Integer maxVehiclesPerDay;
     private Boolean reserveCapacity;
+    private Boolean reserveForSlots;
     private BigDecimal fullDayCapacityHours;
     private String jobCardSerialPrefix;
 
@@ -28,7 +35,14 @@ public class MechanicSettingsResponse {
     private Boolean advanceEnabled;
     private BigDecimal advanceAmount;
 
+    private Boolean autoAllocationEnabled;
+    private BigDecimal autoAllocationCapacityHours;
+    private Boolean autoIssue;
+
     private List<MechanicServiceSettingResponse> serviceSettings;
+
+    private List<ServiceAllocationEntry> serviceAllocations;
+    private Boolean allowGeneralUseExpressHours;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

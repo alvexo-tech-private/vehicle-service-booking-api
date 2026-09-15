@@ -18,11 +18,9 @@ public class VehicleUserRegisterRequest {
     @Pattern(regexp = "^[0-9]{10,15}$", message = "Invalid mobile number")
     private String mobileNumber;
 
-    @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     private String email;
 
-    @NotBlank(message = "City is required")
     private String city;
 
     // Optional

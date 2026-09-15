@@ -153,6 +153,12 @@
 			<artifactId>stripe-java</artifactId>
 			<version>24.0.0</version>
 		</dependency>
+		<!-- PDF generation: settlement receipts / statements -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.3</version>
+		</dependency>
 		<!-- MapStruct for DTO mapping -->
 		<dependency>
 			<groupId>

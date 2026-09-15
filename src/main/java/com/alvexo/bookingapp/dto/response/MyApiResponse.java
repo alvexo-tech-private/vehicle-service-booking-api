@@ -16,6 +16,8 @@ public class MyApiResponse<T> {
     private String message;
     private T data;
     private LocalDateTime timestamp;
+    /** Machine-readable code for client-side branching (e.g. "REFERRAL_EXPIRED"). Null for generic errors. */
+    private String errorCode;
 
     public static <T> MyApiResponse<T> success(T data) {
         return MyApiResponse.<T>builder()
@@ -25,7 +27,7 @@ public class MyApiResponse<T> {
                 .data(data)
                 .build();
     }
-    
+
     public static <T> MyApiResponse<T> success(String message, T data) {
         return MyApiResponse.<T>builder()
                 .success(true)
@@ -33,7 +35,7 @@ public class MyApiResponse<T> {
                 .data(data).timestamp(LocalDateTime.now())
                 .build();
     }
-    
+
     public static <T> MyApiResponse<T> error(String message) {
         return MyApiResponse.<T>builder()
                 .success(false)
@@ -41,5 +43,14 @@ public class MyApiResponse<T> {
                 .timestamp(LocalDateTime.now())
                 .build();
     }
-    
+
+    public static <T> MyApiResponse<T> error(String errorCode, String message) {
+        return MyApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .errorCode(errorCode)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
 }

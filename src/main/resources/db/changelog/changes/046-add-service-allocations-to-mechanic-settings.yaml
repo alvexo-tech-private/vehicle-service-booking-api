@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: 046-add-service-allocations-to-mechanic-settings
+      author: system
+      comment: >
+        Service Allocation table + shared-hours toggle
+        (WORKSHOP_API_AUDIT_AND_BACKEND_SPECIFICATION.md §1.2).
+      changes:
+        - addColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: service_allocations
+                  type: JSONB
+              - column:
+                  name: allow_general_use_express_hours
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: service_allocations
+              - column:
+                  name: allow_general_use_express_hours

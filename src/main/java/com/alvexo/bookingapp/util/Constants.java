@@ -30,7 +30,44 @@ public class Constants {
     
     // Payment
     public static final String DEFAULT_CURRENCY = "USD";
-    
+
+    // Workshop profile — onboarding
+    public static final java.math.BigDecimal WORKSHOP_ONBOARDING_FEE = new java.math.BigDecimal("1000.00");
+
+    // Workshop profile — images / support attachments
+    public static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024 * 1024;   // 5 MB
+    public static final long MAX_SUPPORT_IMAGE_SIZE_BYTES = 2L * 1024 * 1024; // 2 MB
+    public static final java.util.Set<String> ALLOWED_IMAGE_CONTENT_TYPES =
+            java.util.Set.of("image/jpeg", "image/jpg", "image/png", "image/webp");
+    public static final int SUPPORT_DESCRIPTION_MAX_WORDS = 200;
+
+    // Workshop profile — platform verification
+    public static final int PLATFORM_VERIFICATION_MIN_METHODS = 2;
+
+    // Service Desk — cancellation past the reschedule cutoff (SERVICE_DESK_API_SPEC.md §1.7, BR-22/30)
+    public static final java.math.BigDecimal SERVICE_RELIABILITY_ADJUSTMENT = new java.math.BigDecimal("30.00");
+    public static final String DEFAULT_CANCELLATION_MESSAGE =
+            "Due to unavoidable circumstances, your service has been cancelled. "
+            + "We are sorry for the inconvenience caused.";
+
+    // Workshop profile — location
+    public static final java.util.Set<String> INDIAN_STATES = java.util.Set.of(
+            "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
+            "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh",
+            "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+            "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+            "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
+            "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh",
+            "Lakshadweep", "Puducherry"
+    );
+
+    // Settlement (WORKSHOP_FINANCE_API_SPEC.md §2)
+    public static final java.math.BigDecimal SETTLEMENT_DAILY_ADJUSTMENT_CAP = new java.math.BigDecimal("200.00");
+    public static final java.math.BigDecimal SETTLEMENT_SUSPENSION_THRESHOLD = new java.math.BigDecimal("1000.00");
+    public static final int SETTLEMENT_CUSTOM_RANGE_MAX_DAYS = 7;
+    public static final int SETTLEMENT_CUSTOM_RANGE_LOOKBACK_DAYS = 30;
+    public static final int SETTLEMENT_LATEST_LOOKBACK_DAYS = 60;
+
     private Constants() {
         // Private constructor to prevent instantiation
     }
