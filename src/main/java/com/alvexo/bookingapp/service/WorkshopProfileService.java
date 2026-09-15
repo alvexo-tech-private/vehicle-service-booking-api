@@ -514,6 +514,67 @@ public class WorkshopProfileService {
         };
     }
 
+    // ── Current Status card (WS-STATUS-001) ────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public WorkshopStatusResponse getPlatformStatus(User mechanic) {
+        validateRole(mechanic);
+        WorkshopProfile profile = getOrCreateProfile(mechanic);
+
+        if (!Boolean.TRUE.equals(mechanic.getActive())) {
+            return statusResponse("DEACTIVATED", "Your workshop account has been deactivated.",
+                    false, "Customer bookings are not allowed while your account is deactivated.",
+                    profile.getUpdatedAt());
+        }
+        if (Boolean.TRUE.equals(profile.getSuspended())) {
+            String reason = profile.getSuspensionReason() != null
+                    ? profile.getSuspensionReason() : "Your workshop has been paused by the platform.";
+            return statusResponse("PAUSED_ADMIN_ACTION", reason, false,
+                    "Customer bookings are not allowed while your workshop is paused.", profile.getUpdatedAt());
+        }
+
+        Optional<WorkshopOnboarding> onboarding = onboardingRepository.findByMechanic(mechanic);
+        boolean moreInfoRequested = onboarding.map(WorkshopOnboarding::getDecision)
+                .filter(d -> d == OnboardingDecision.MORE_INFO).isPresent();
+
+        return switch (profile.getStatus()) {
+            case NEW_TO_APP, IN_PROGRESS -> moreInfoRequested
+                    ? statusResponse("DOCUMENTS_INSUFFICIENT",
+                        onboarding.map(WorkshopOnboarding::getDecisionReason)
+                                .orElse("Additional documents are required to continue onboarding."),
+                        false, "Customer bookings are not allowed until the requested documents are submitted.",
+                        profile.getUpdatedAt())
+                    : statusResponse("INITIATE_ONBOARDING",
+                        "Complete your onboarding to get listed on the platform.",
+                        false, "Customer bookings are not allowed until onboarding is complete.",
+                        profile.getUpdatedAt());
+            case PENDING -> statusResponse("ADMIN_VERIFICATION_PENDING",
+                    "Your onboarding has been submitted and is being reviewed.",
+                    false, "Customer bookings are not allowed while Admin verification is pending.",
+                    profile.getUpdatedAt());
+            case REJECTED -> statusResponse("REJECTED",
+                    onboarding.map(WorkshopOnboarding::getDecisionReason)
+                            .orElse("Your onboarding was rejected. Please review and resubmit."),
+                    false, "Customer bookings are not allowed until your onboarding is approved.",
+                    profile.getUpdatedAt());
+            case VERIFIED -> statusResponse("SELF_LISTED",
+                    "Your onboarding is approved and your workshop is listed on the platform.",
+                    true, null, profile.getUpdatedAt());
+            case SUSPENDED -> statusResponse("PAUSED_ADMIN_ACTION",
+                    profile.getSuspensionReason() != null
+                            ? profile.getSuspensionReason() : "Your workshop has been paused by the platform.",
+                    false, "Customer bookings are not allowed while your workshop is paused.",
+                    profile.getUpdatedAt());
+        };
+    }
+
+    private WorkshopStatusResponse statusResponse(String platformStatus, String explanation, boolean bookingsAllowed,
+            String bookingWarning, LocalDateTime updatedAt) {
+        // No tiered trust model beyond SELF_LISTED yet — mirrors both example
+        // payloads in WS-STATUS-001, where trustLevel stays constant across platformStatus.
+        return new WorkshopStatusResponse(platformStatus, "SELF_LISTED", explanation, bookingsAllowed, bookingWarning, updatedAt);
+    }
+
     // ── Section 9: Operational Trust ──────────────────────────────────────────
 
     @Transactional(readOnly = true)

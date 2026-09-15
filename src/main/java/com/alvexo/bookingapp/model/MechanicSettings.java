@@ -10,6 +10,7 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Table(name = "mechanic_settings")
@@ -145,6 +146,19 @@ public class MechanicSettings {
     @Column(name = "preferences", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private String preferences;
+
+    /**
+     * Auto vs Mechanic assignment per service type
+     * (WORKSHOP_API_AUDIT_AND_BACKEND_SPECIFICATION.md §1.2).
+     */
+    @Column(name = "service_allocations", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<ServiceAllocationEntry> serviceAllocations;
+
+    /** "Allow General bookings to use Express hours when spare capacity exists" toggle. */
+    @Column(name = "allow_general_use_express_hours", nullable = false)
+    @Builder.Default
+    private Boolean allowGeneralUseExpressHours = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -1,6 +1,7 @@
 package com.alvexo.bookingapp.dto.request;
 
 import com.alvexo.bookingapp.model.JobCardType;
+import com.alvexo.bookingapp.model.ServiceAllocationEntry;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -83,4 +84,10 @@ public class MechanicSettingsRequest {
 
     @Valid
     private List<MechanicServiceSettingRequest> serviceSettings;
+
+    /** Auto vs Mechanic assignment per service type. Omit to leave unchanged. */
+    private List<ServiceAllocationEntry> serviceAllocations;
+
+    /** "Allow General bookings to use Express hours when spare capacity exists". */
+    private Boolean allowGeneralUseExpressHours;
 }

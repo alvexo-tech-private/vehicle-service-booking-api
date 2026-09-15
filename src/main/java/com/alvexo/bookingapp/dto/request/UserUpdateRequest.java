@@ -18,4 +18,7 @@ public class UserUpdateRequest {
     private BigDecimal latitude;
     private BigDecimal longitude;
     private String bio;
+    private String displayName;
+    private Boolean notificationsEnabled;
+    private Boolean whatsappNotificationsEnabled;
 }

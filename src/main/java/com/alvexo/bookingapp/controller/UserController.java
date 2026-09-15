@@ -77,7 +77,16 @@ public class UserController {
         if (request.getLatitude() != null) user.setLatitude(request.getLatitude());
         if (request.getLongitude() != null) user.setLongitude(request.getLongitude());
         if (request.getBio() != null) user.setBio(request.getBio());
-        
+        if (request.getDisplayName() != null) user.setDisplayName(request.getDisplayName());
+        if (request.getNotificationsEnabled() != null) user.setNotificationsEnabled(request.getNotificationsEnabled());
+        if (request.getWhatsappNotificationsEnabled() != null) user.setWhatsappNotificationsEnabled(request.getWhatsappNotificationsEnabled());
+
+        // Subordination rule: WhatsApp notifications can only be on while Promotion
+        // Notification is on (RIDER_PROFILE spec §3).
+        if (!Boolean.TRUE.equals(user.getNotificationsEnabled())) {
+            user.setWhatsappNotificationsEnabled(false);
+        }
+
         user = userRepository.save(user);
         
         UserResponse response = convertToResponse(user);
@@ -228,6 +237,11 @@ public class UserController {
                 .totalReferrals(user.getTotalReferrals())
                 .totalBonusEarned(user.getTotalBonusEarned())
                 .createdAt(user.getCreatedAt())
+                .displayName(user.getDisplayName() != null && !user.getDisplayName().isBlank()
+                        ? user.getDisplayName()
+                        : user.getFirstName())
+                .notificationsEnabled(user.getNotificationsEnabled())
+                .whatsappNotificationsEnabled(user.getWhatsappNotificationsEnabled())
                 .build();
     }
 }

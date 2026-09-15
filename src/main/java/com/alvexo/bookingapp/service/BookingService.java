@@ -561,6 +561,105 @@ public class BookingService {
     }
 
     /**
+     * Workshop proposes an alternate date for an over-capacity booking
+     * (RIDER_BOOKING_COLLABORATION spec §3 Seam 5). Unlike {@link #rescheduleBooking},
+     * scheduledDateTime does NOT move until the rider explicitly accepts via
+     * {@link #respondToProposal}.
+     */
+    @Transactional
+    public BookingResponse proposeDate(Long bookingId, User mechanic, LocalDateTime proposedDateTime) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+            throw new BadRequestException("You don't have access to this booking");
+        }
+        if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.REJECTED
+                || booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new BadRequestException("Cannot propose a date for a " + booking.getStatus() + " booking");
+        }
+        if (proposedDateTime.isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("Cannot propose a past date/time");
+        }
+
+        booking.setProposedDateTime(proposedDateTime);
+        booking.setProposalStatus(com.alvexo.bookingapp.model.BookingProposalStatus.PENDING);
+        booking = bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getVehicleUser(),
+                "Alternate Date Proposed",
+                "Your workshop proposed moving booking #" + booking.getBookingNumber() + " to "
+                        + proposedDateTime + ". Please accept or decline.",
+                NotificationType.GENERAL,
+                "Booking",
+                booking.getId());
+
+        return convertToResponse(booking);
+    }
+
+    /**
+     * Rider accepts or declines a pending alternate-date proposal. Accepting moves
+     * scheduledDateTime to the proposed date; declining cancels the booking (advance
+     * refund, if any, is handled by the existing cancellation flow).
+     */
+    @Transactional
+    public BookingResponse respondToProposal(Long bookingId, User rider, boolean accept) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getVehicleUser().getId().equals(rider.getId())) {
+            throw new BadRequestException("You don't have access to this booking");
+        }
+        if (booking.getProposalStatus() != com.alvexo.bookingapp.model.BookingProposalStatus.PENDING
+                || booking.getProposedDateTime() == null) {
+            throw new BadRequestException("There is no pending date proposal for this booking");
+        }
+
+        if (accept) {
+            List<Booking> conflicts =
+                    bookingRepository.findAndLockConflicting(booking.getMechanic(), booking.getProposedDateTime());
+            if (!conflicts.isEmpty()) {
+                throw new BadRequestException("The proposed time is no longer available. Please contact the workshop.");
+            }
+            booking.setScheduledDateTime(booking.getProposedDateTime());
+            booking.setProposalStatus(com.alvexo.bookingapp.model.BookingProposalStatus.ACCEPTED);
+            booking.setProposedDateTime(null);
+            booking = bookingRepository.save(booking);
+
+            notificationService.createNotification(
+                    booking.getMechanic(),
+                    "Alternate Date Accepted",
+                    "The customer accepted the proposed date for booking #" + booking.getBookingNumber()
+                            + ". New date: " + booking.getScheduledDateTime(),
+                    NotificationType.GENERAL,
+                    "Booking",
+                    booking.getId());
+        } else {
+            booking.setProposalStatus(com.alvexo.bookingapp.model.BookingProposalStatus.DECLINED);
+            booking.setProposedDateTime(null);
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setServiceStage(null);
+            booking.setCancellationReason("Rider declined the proposed alternate date");
+            booking.setCancelledAt(LocalDateTime.now());
+            booking.setCancelledBy(rider);
+            booking = bookingRepository.save(booking);
+
+            notificationService.createNotification(
+                    booking.getMechanic(),
+                    "Alternate Date Declined",
+                    "The customer declined the proposed date for booking #" + booking.getBookingNumber()
+                            + "; the booking has been cancelled" + (booking.getAdvancePaid() != null
+                                    && booking.getAdvancePaid().signum() > 0 ? " and the advance is due for refund." : "."),
+                    NotificationType.BOOKING_CANCELLED,
+                    "Booking",
+                    booking.getId());
+        }
+
+        return convertToResponse(booking);
+    }
+
+    /**
      * Manually issues a job card for a CONFIRMED booking whose mechanic has
      * autoIssue = false. No-op error if a job card already exists.
      */
@@ -699,6 +798,8 @@ public class BookingService {
                 .engineOilReplacement(booking.getEngineOilReplacement())
                 .completedAt(booking.getCompletedAt())
                 .createdAt(booking.getCreatedAt())
+                .proposedDateTime(booking.getProposedDateTime())
+                .proposalStatus(booking.getProposalStatus())
                 .build();
     }
 

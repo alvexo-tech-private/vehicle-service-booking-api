@@ -79,3 +79,16 @@ databaseChangeLog:
   # ── Admin Portal soft-delete support ─────────────────────────────────────────
   - include:
           file: db/changelog/changes/041-add-deleted-flag-to-users.yaml
+  # ── Backend Specifications & API Requirements (Issues #108-#122) ─────────────
+  - include:
+          file: db/changelog/changes/042-create-captcha-challenges-table.yaml
+  - include:
+          file: db/changelog/changes/043-add-profile-fields-to-users.yaml
+  - include:
+          file: db/changelog/changes/044-create-workshop-service-eligibility-table.yaml
+  - include:
+          file: db/changelog/changes/045-add-proposal-fields-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/046-add-service-allocations-to-mechanic-settings.yaml
+  - include:
+          file: db/changelog/changes/047-create-mechanic-settings-restore-points-table.yaml

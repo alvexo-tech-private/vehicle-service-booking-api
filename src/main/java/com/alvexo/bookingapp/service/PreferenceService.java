@@ -114,7 +114,9 @@ public class PreferenceService {
                 user.getTotalBookingsCompleted(),
                 user.getBio(),
                 user.getLatitude(),
-                user.getLongitude()
+                user.getLongitude(),
+                java.util.List.of(),
+                null
         );
     }
 }

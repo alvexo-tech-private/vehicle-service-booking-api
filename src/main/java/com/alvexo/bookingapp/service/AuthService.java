@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alvexo.bookingapp.dto.response.CheckPhoneResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -42,6 +43,7 @@ public class AuthService {
     private final OtpService otpService;
     private final NotificationService notificationService;
     private final MechanicAvailabilityRepository availabilityRepository;
+    private final CaptchaService captchaService;
 
     public AuthService(
             UserRepository userRepository,
@@ -52,7 +54,8 @@ public class AuthService {
             ReferralService referralService,
             OtpService otpService,
             NotificationService notificationService,
-            MechanicAvailabilityRepository availabilityRepository) {
+            MechanicAvailabilityRepository availabilityRepository,
+            CaptchaService captchaService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -62,6 +65,7 @@ public class AuthService {
         this.otpService = otpService;
         this.notificationService = notificationService;
         this.availabilityRepository = availabilityRepository;
+        this.captchaService = captchaService;
     }
 
     /**
@@ -195,6 +199,35 @@ public class AuthService {
         notificationService.sendOtpEmail(mobile, otp);
     }
 
+    /**
+     * Pre-flight lookup so the app can show "Not yet registered? Please sign up."
+     * before asking for a PIN (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §1).
+     */
+    public CheckPhoneResponse checkPhone(String phone) {
+        String mobile = MobileNumberUtil.normalize(phone);
+
+        return userRepository.findByMobileNumber(mobile)
+                .map(user -> CheckPhoneResponse.builder()
+                        .exists(true)
+                        .role(user.getRole())
+                        .isVerified(user.getMobileVerified())
+                        .build())
+                .orElseGet(() -> CheckPhoneResponse.builder()
+                        .exists(false)
+                        .message("Not yet registered? Please sign up.")
+                        .build());
+    }
+
+    /**
+     * Captcha-gated OTP request (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §2 —
+     * OTP misuse prevention). Validates the captcha first, then delegates to the
+     * same delivery path as {@link #sendOtp}.
+     */
+    public void requestOtp(RequestOtpRequest request) {
+        captchaService.validateAndConsume(request.getCaptchaId(), request.getCaptchaResponse());
+        sendOtp(request.getPhone());
+    }
+
 
 
     @Transactional
@@ -321,16 +354,21 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse registerVehicleUser(VehicleUserRegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        String email = request.getEmail();
+        if (email == null || email.isBlank()) {
+            // Email column is NOT NULL/UNIQUE and doubles as the JWT/login username,
+            // so synthesize one from the (already unique) mobile number when omitted.
+            email = mobile + "@no-email.alvexo.app";
+        } else if (userRepository.existsByEmail(email)) {
             throw new BadRequestException("Email already registered");
         }
-
-        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
 
         if (userRepository.existsByMobileNumber(mobile)) {
             throw new BadRequestException("Mobile number already registered");
         }
-        
+
         if(!request.getPin().equals((request.getConfirmPin()))){
         	throw new BadRequestException("PIN and confirm PIN should be same");
         }
@@ -339,7 +377,7 @@ public class AuthService {
                 .firstName(request.getName())
                 .lastName("")
                 .mobileNumber(mobile)
-                .email(request.getEmail())
+                .email(email)
                 .city(request.getCity())
                 .area(request.getArea())
                 .password(passwordEncoder.encode(String.valueOf(request.getPin())))

@@ -1,6 +1,7 @@
 package com.alvexo.bookingapp.dto.response;
 
 import com.alvexo.bookingapp.model.JobCardType;
+import com.alvexo.bookingapp.model.ServiceAllocationEntry;
 import com.alvexo.bookingapp.model.WorkshopClassification;
 import lombok.*;
 
@@ -39,6 +40,9 @@ public class MechanicSettingsResponse {
     private Boolean autoIssue;
 
     private List<MechanicServiceSettingResponse> serviceSettings;
+
+    private List<ServiceAllocationEntry> serviceAllocations;
+    private Boolean allowGeneralUseExpressHours;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

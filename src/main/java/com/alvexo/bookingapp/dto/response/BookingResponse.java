@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.alvexo.bookingapp.model.BookingChannel;
+import com.alvexo.bookingapp.model.BookingProposalStatus;
 import com.alvexo.bookingapp.model.BookingStatus;
 import com.alvexo.bookingapp.model.BookingType;
 import com.alvexo.bookingapp.model.ServiceType;
@@ -60,4 +61,7 @@ public class BookingResponse {
 
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
+
+    private LocalDateTime proposedDateTime;
+    private BookingProposalStatus proposalStatus;
 }

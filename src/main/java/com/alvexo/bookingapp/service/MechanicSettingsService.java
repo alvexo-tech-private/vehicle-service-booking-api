@@ -196,6 +196,7 @@ public class MechanicSettingsService {
                 .autoAllocationEnabled(s.getAutoAllocationEnabled())
                 .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
                 .autoIssue(s.getAutoIssue())
+                .allowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours())
                 .build();
     }
 
@@ -214,6 +215,7 @@ public class MechanicSettingsService {
         auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationEnabled", before.getAutoAllocationEnabled(), after.getAutoAllocationEnabled());
         auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationCapacityHours", before.getAutoAllocationCapacityHours(), after.getAutoAllocationCapacityHours());
         auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoIssue", before.getAutoIssue(), after.getAutoIssue());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "allowGeneralUseExpressHours", before.getAllowGeneralUseExpressHours(), after.getAllowGeneralUseExpressHours());
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -261,6 +263,8 @@ public class MechanicSettingsService {
         s.setAutoAllocationEnabled(r.getAutoAllocationEnabled());
         s.setAutoAllocationCapacityHours(r.getAutoAllocationCapacityHours());
         s.setAutoIssue(r.getAutoIssue());
+        if (r.getServiceAllocations() != null) s.setServiceAllocations(r.getServiceAllocations());
+        if (r.getAllowGeneralUseExpressHours() != null) s.setAllowGeneralUseExpressHours(r.getAllowGeneralUseExpressHours());
     }
 
     /**
@@ -364,6 +368,8 @@ public class MechanicSettingsService {
                 .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
                 .autoIssue(s.getAutoIssue())
                 .serviceSettings(services)
+                .serviceAllocations(s.getServiceAllocations())
+                .allowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
                 .build();

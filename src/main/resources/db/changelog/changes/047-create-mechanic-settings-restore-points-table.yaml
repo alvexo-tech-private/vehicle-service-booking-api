@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: 047-create-mechanic-settings-restore-points-table
+      author: system
+      comment: >
+        Settings Restore Points (WORKSHOP_API_AUDIT_AND_BACKEND_SPECIFICATION.md §1.2,
+        issue #122) — named snapshots of a workshop's capacity + configuration settings.
+      changes:
+        - createTable:
+            tableName: mechanic_settings_restore_points
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: settings_snapshot
+                  type: JSONB
+              - column:
+                  name: configuration_snapshot
+                  type: JSONB
+              - column:
+                  name: saved_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_settings_restore_points
+            baseColumnNames: mechanic_id
+            constraintName: fk_settings_restore_points_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - createIndex:
+            tableName: mechanic_settings_restore_points
+            indexName: idx_settings_restore_points_mechanic
+            columns:
+              - column:
+                  name: mechanic_id
+      rollback:
+        - dropTable:
+            tableName: mechanic_settings_restore_points

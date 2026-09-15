@@ -1,0 +1,75 @@
+databaseChangeLog:
+  - changeSet:
+      id: 044-create-workshop-service-eligibility-table
+      author: system
+      comment: >
+        Vehicle make service eligibility (WORKSHOP_API_AUDIT_AND_BACKEND_SPECIFICATION.md §1.1,
+        issues #115/#117) — which vehicle makes a workshop services per fuel type/category.
+      changes:
+        - createTable:
+            tableName: workshop_service_eligibility
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fuel_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: service_category
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: vehicle_makes
+                  type: TEXT
+              - column:
+                  name: other_makes_allowed
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: workshop_service_eligibility
+            columnNames: mechanic_id, fuel_type, service_category
+            constraintName: uq_workshop_eligibility_mechanic_fuel_category
+        - addForeignKeyConstraint:
+            baseTableName: workshop_service_eligibility
+            baseColumnNames: mechanic_id
+            constraintName: fk_workshop_eligibility_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - createIndex:
+            tableName: workshop_service_eligibility
+            indexName: idx_workshop_eligibility_mechanic
+            columns:
+              - column:
+                  name: mechanic_id
+      rollback:
+        - dropTable:
+            tableName: workshop_service_eligibility

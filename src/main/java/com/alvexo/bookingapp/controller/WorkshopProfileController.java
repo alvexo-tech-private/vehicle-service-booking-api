@@ -50,6 +50,13 @@ public class WorkshopProfileController {
         return ResponseEntity.ok(MyApiResponse.success(profileService.getAggregate(resolveUser(authentication))));
     }
 
+    @Operation(summary = "Get current status card",
+               description = "WS-STATUS-001 — onboarding/verification progress, booking availability, and a plain-language explanation.")
+    @GetMapping("/status")
+    public ResponseEntity<MyApiResponse<WorkshopStatusResponse>> getStatus(Authentication authentication) {
+        return ResponseEntity.ok(MyApiResponse.success(profileService.getPlatformStatus(resolveUser(authentication))));
+    }
+
     // ── Section 2: Owner Information ──────────────────────────────────────────
 
     @Operation(summary = "Get owner information")

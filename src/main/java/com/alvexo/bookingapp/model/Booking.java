@@ -194,6 +194,19 @@ public class Booking {
     @Builder.Default
     private Boolean engineOilReplacement = false;
 
+    /**
+     * Alternate Date Proposal flow (RIDER_BOOKING_COLLABORATION spec §3 Seam 5) — the
+     * workshop's over-capacity reassignment offered to the rider for accept/decline,
+     * distinct from a direct reschedule since scheduledDateTime doesn't move until accepted.
+     */
+    @Column(name = "proposed_date_time")
+    private LocalDateTime proposedDateTime;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "proposal_status", nullable = false, length = 20)
+    @Builder.Default
+    private BookingProposalStatus proposalStatus = BookingProposalStatus.NONE;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

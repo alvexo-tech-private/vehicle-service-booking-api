@@ -145,6 +145,39 @@ public class BookingController {
         return ResponseEntity.ok(MyApiResponse.success("Booking rescheduled successfully", response));
     }
 
+    @Operation(summary = "Propose an alternate date",
+               description = "Mechanic proposes moving an over-capacity booking to a new date/time. "
+                            + "scheduledDateTime does not change until the rider accepts via /proposal-response.")
+    @PostMapping("/{id}/propose-date")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> proposeDate(
+            @PathVariable Long id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.ProposeDateRequest request,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.proposeDate(id, mechanic, request.getProposedDateTime());
+        return ResponseEntity.ok(MyApiResponse.success("Alternate date proposed", response));
+    }
+
+    @Operation(summary = "Accept or decline a proposed alternate date",
+               description = "Rider responds to a pending propose-date. Accepting moves the booking to the "
+                            + "proposed date; declining cancels the booking.")
+    @PostMapping("/{id}/proposal-response")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> respondToProposal(
+            @PathVariable Long id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.ProposalResponseRequest request,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.respondToProposal(id, rider, Boolean.TRUE.equals(request.getAccept()));
+        String message = Boolean.TRUE.equals(request.getAccept()) ? "Proposal accepted" : "Proposal declined; booking cancelled";
+        return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
     @Operation(summary = "Issue job card manually",
                description = "For mechanics with autoIssue = false: issues a job card for an already-CONFIRMED booking.")
     @PutMapping("/{id}/issue-job-card")

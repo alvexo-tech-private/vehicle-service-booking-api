@@ -60,6 +60,19 @@ public class User {
     
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
+
+    /** Optional public-facing name shown instead of firstName/lastName; falls back to name when blank. */
+    @Column(name = "display_name", length = 120)
+    private String displayName;
+
+    /** "Promotion Notification" toggle. WhatsApp notifications are subordinate to this. */
+    @Column(name = "notifications_enabled", nullable = false)
+    @Builder.Default
+    private Boolean notificationsEnabled = true;
+
+    @Column(name = "whatsapp_notifications_enabled", nullable = false)
+    @Builder.Default
+    private Boolean whatsappNotificationsEnabled = false;
     
     // Address fields
     @Column(name = "address_line1")
