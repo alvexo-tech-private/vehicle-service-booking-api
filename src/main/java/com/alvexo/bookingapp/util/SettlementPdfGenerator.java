@@ -48,7 +48,7 @@ public final class SettlementPdfGenerator {
                 y = writeLine(cs, MARGIN, y, FONT, 11, "Settlement date: " + s.getSettlementDate());
                 y = writeLine(cs, MARGIN, y, FONT, 11, "Net pay: " + money(s.getNetPay()));
                 y = writeLine(cs, MARGIN, y, FONT, 11,
-                        "Service Reliability Adjustment: -" + money(s.getServiceReliabilityAdjustment()));
+                        "Advance handling fee: -" + money(s.getServiceReliabilityAdjustment()));
                 y = writeLine(cs, MARGIN, y, FONT_BOLD, 11, "Settlement released: " + money(s.getSettlementReleased()));
                 y -= LINE_HEIGHT;
 
@@ -85,7 +85,7 @@ public final class SettlementPdfGenerator {
 
                 float[] columnX = {MARGIN, MARGIN + 90, MARGIN + 180, MARGIN + 280, MARGIN + 380};
                 y = writeRow(cs, columnX, y, FONT_BOLD,
-                        "Date", "Net pay", "Adjustment", "Released", "Status");
+                        "Date", "Net pay", "Handling fee", "Released", "Status");
                 y -= 4;
 
                 java.math.BigDecimal totalNet = java.math.BigDecimal.ZERO;

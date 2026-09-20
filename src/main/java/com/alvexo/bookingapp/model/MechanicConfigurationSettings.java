@@ -77,9 +77,13 @@ public class MechanicConfigurationSettings {
     @Builder.Default
     private Integer serviceDueIntervalDays = 90;
 
+    /**
+     * Days after the first reminder's ACTUAL send before the second is due
+     * (BACKEND_REQUIREMENTS_SERVICE_REMINDER_128.md §1) — never from the service due date.
+     */
     @Column(name = "second_reminder_interval_days", nullable = false)
     @Builder.Default
-    private Integer secondReminderIntervalDays = 15;
+    private Integer secondReminderIntervalDays = 7;
 
     /** How many times the reminder intervals have been changed this calendar year (capped at 2). */
     @Column(name = "reminder_changes_this_year", nullable = false)

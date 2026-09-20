@@ -41,9 +41,12 @@ public class BookingController {
     
     @Autowired
     private BookingService bookingService;
-    
+
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private com.alvexo.bookingapp.service.PaymentService paymentService;
     
     @Operation(summary = "Create a booking", description = "Vehicle user creates a new service booking with a mechanic.")
     @PostMapping
@@ -176,6 +179,53 @@ public class BookingController {
         BookingResponse response = bookingService.respondToProposal(id, rider, Boolean.TRUE.equals(request.getAccept()));
         String message = Boolean.TRUE.equals(request.getAccept()) ? "Proposal accepted" : "Proposal declined; booking cancelled";
         return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
+    @Operation(summary = "Workshop accepts/rejects a Today Approval request",
+               description = "Accepting starts a confirmation window (returns confirmationExpiresAt/requiredAdvance) "
+                            + "without reserving capacity yet; the rider must call /confirm-request next.")
+    @PostMapping("/{id}/workshop-decision")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.WorkshopDecisionResponse>> workshopDecision(
+            @PathVariable Long id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.WorkshopDecisionRequest request,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        var response = bookingService.workshopDecision(id, mechanic, Boolean.TRUE.equals(request.getAccept()));
+        String message = Boolean.TRUE.equals(request.getAccept()) ? "Request accepted" : "Request rejected";
+        return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
+    @Operation(summary = "Rider confirms an accepted Today Approval request",
+               description = "Reserves capacity and schedules the booking if no advance is owed. If an advance is "
+                            + "still owed, returns paymentRequired=true instead — pay via /payment-intent, then call this again.")
+    @PostMapping("/{id}/confirm-request")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.ConfirmRequestResponse>> confirmRequest(
+            @PathVariable Long id,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        var response = bookingService.confirmRequest(id, rider);
+        String message = response.paymentRequired() ? "Advance payment required" : "Booking confirmed";
+        return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
+    @Operation(summary = "Create a payment intent for a booking",
+               description = "Computes the required advance + platform fee for the booking's current state "
+                            + "(§6). Returns 0/0 when nothing is currently owed.")
+    @PostMapping("/{id}/payment-intent")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.PaymentIntentResponse>> createPaymentIntent(
+            @PathVariable Long id,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return ResponseEntity.ok(MyApiResponse.success(paymentService.createBookingPaymentIntent(rider, id)));
     }
 
     @Operation(summary = "Issue job card manually",

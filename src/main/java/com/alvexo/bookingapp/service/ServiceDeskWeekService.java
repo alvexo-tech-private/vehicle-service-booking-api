@@ -115,7 +115,7 @@ public class ServiceDeskWeekService {
             throw new BadRequestException("A " + booking.getStatus() + " booking cannot be cancelled");
         }
 
-        var reliabilityAdjustment = todayService.applyCancellation(booking, mechanic, message);
+        todayService.applyCancellation(booking, mechanic, message);
         bookingRepository.save(booking);
 
         notificationService.createNotification(
@@ -129,7 +129,6 @@ public class ServiceDeskWeekService {
         return ServiceCancelResponse.builder()
                 .bookingId(booking.getBookingNumber())
                 .cancellationMessage(booking.getCancellationMessage())
-                .reliabilityAdjustment(reliabilityAdjustment)
                 .build();
     }
 

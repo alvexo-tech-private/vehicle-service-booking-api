@@ -1,0 +1,126 @@
+databaseChangeLog:
+  - changeSet:
+      id: 051-create-reminder-cycles-table
+      author: system
+      comment: >
+        Service Reminder Scheduling (BACKEND_REQUIREMENTS_SERVICE_REMINDER_128.md) — persisted
+        reminder cycle per (mechanic, vehicle, customer) with independently-tracked dates.
+      changes:
+        - createTable:
+            tableName: reminder_cycles
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: vehicle_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_service_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scheduled_service_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: first_reminder_planned_at
+                  type: TIMESTAMP
+              - column:
+                  name: first_reminder_sent_at
+                  type: TIMESTAMP
+              - column:
+                  name: second_reminder_scheduled_at
+                  type: TIMESTAMP
+              - column:
+                  name: second_reminder_sent_at
+                  type: TIMESTAMP
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: PLANNED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: reminder_cycles
+            baseColumnNames: mechanic_id
+            constraintName: fk_reminder_cycles_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: reminder_cycles
+            baseColumnNames: vehicle_id
+            constraintName: fk_reminder_cycles_vehicle
+            referencedTableName: vehicles
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: reminder_cycles
+            baseColumnNames: customer_id
+            constraintName: fk_reminder_cycles_customer
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - createIndex:
+            tableName: reminder_cycles
+            indexName: idx_reminder_cycles_mechanic_vehicle_customer
+            columns:
+              - column:
+                  name: mechanic_id
+              - column:
+                  name: vehicle_id
+              - column:
+                  name: customer_id
+      rollback:
+        - dropTable:
+            tableName: reminder_cycles
+
+  - changeSet:
+      id: 051-backfill-second-reminder-interval-default
+      author: system
+      comment: >
+        §1 — default secondReminderIntervalDays moves from 15 to 7. Only rows still on the
+        untouched platform default (never customised) are migrated.
+      changes:
+        - sql:
+            sql: >
+              UPDATE mechanic_configuration_settings
+              SET second_reminder_interval_days = 7
+              WHERE second_reminder_interval_days = 15
+                AND reminder_changes_this_year = 0;
+      rollback:
+        - empty: true

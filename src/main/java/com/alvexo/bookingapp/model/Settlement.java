@@ -13,13 +13,15 @@ import java.time.LocalTime;
 /**
  * One row per (mechanic, settlementDate) — the payout for a completed service
  * day (WORKSHOP_FINANCE_API_SPEC.md §2). Materialized on first read for any
- * past date that has qualifying booking activity (advance collected and/or a
- * reliability adjustment); never generated for today or a future date, since
- * the day isn't "done" yet — that's what the live Earnings tab is for.
+ * past date that collected at least one advance payment; never generated for
+ * a day with zero advance collected, and never for today or a future date,
+ * since the day isn't "done" yet — that's what the live Earnings tab is for.
  *
- * netPay / serviceReliabilityAdjustment are computed from that day's bookings
- * at generation time (see SettlementService) and then frozen — later changes
- * to a booking after its settlement exists do not retroactively change it,
+ * netPay / serviceReliabilityAdjustment (now the flat advance-handling fee —
+ * see {@link com.alvexo.bookingapp.util.Constants#ADVANCE_HANDLING_FEE}; field
+ * name kept for API compatibility) are computed from that day's bookings at
+ * generation time (see SettlementService) and then frozen — later changes to
+ * a booking after its settlement exists do not retroactively change it,
  * mirroring how a real payout, once computed, isn't silently rewritten.
  */
 @Entity
@@ -43,9 +45,11 @@ public class Settlement {
     @Column(name = "settlement_date", nullable = false)
     private LocalDate settlementDate;
 
+    /** Total advance collected across the day's bookings. */
     @Column(name = "net_pay", nullable = false, precision = 10, scale = 2)
     private BigDecimal netPay;
 
+    /** Flat ₹{@link com.alvexo.bookingapp.util.Constants#ADVANCE_HANDLING_FEE} fee × advance-carrying bookings. */
     @Column(name = "service_reliability_adjustment", nullable = false, precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal serviceReliabilityAdjustment = BigDecimal.ZERO;

@@ -14,7 +14,6 @@ import com.alvexo.bookingapp.model.WeekStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.List;
@@ -48,13 +47,13 @@ public final class ServiceDeskMapper {
      */
     public static ServiceWorkspaceStatus toWorkspaceStatus(Booking booking) {
         return switch (booking.getStatus()) {
-            case CONFIRMED -> ServiceWorkspaceStatus.SCHEDULED;
+            case CONFIRMED, SCHEDULED -> ServiceWorkspaceStatus.SCHEDULED;
             case IN_PROGRESS -> booking.getServiceStage() == ServiceDeskStage.PENDING
                     ? ServiceWorkspaceStatus.PENDING : ServiceWorkspaceStatus.ARRIVED;
             case COMPLETED -> ServiceWorkspaceStatus.COMPLETED;
-            case CANCELLED, REJECTED -> ServiceWorkspaceStatus.CANCELLED;
-            case PENDING -> throw new IllegalStateException(
-                    "PENDING bookings must be excluded from the Service Desk before mapping");
+            case CANCELLED, REJECTED, EXPIRED -> ServiceWorkspaceStatus.CANCELLED;
+            case PENDING, REQUESTED, PENDING_PAYMENT -> throw new IllegalStateException(
+                    "PENDING/REQUESTED/PENDING_PAYMENT bookings must be excluded from the Service Desk before mapping");
         };
     }
 
@@ -114,16 +113,6 @@ public final class ServiceDeskMapper {
             return CapacityBand.MOD;
         }
         return CapacityBand.LOW;
-    }
-
-    /**
-     * ₹30 Service Reliability Adjustment (§1.7, BR-22/30): applies when the
-     * cancellation happens after the mechanic's configured reschedule cutoff
-     * time-of-day. Null cutoff means the rule never applies.
-     */
-    public static BigDecimal computeReliabilityAdjustment(LocalTime rescheduleCutoffTime, LocalTime now) {
-        return rescheduleCutoffTime != null && now.isAfter(rescheduleCutoffTime)
-                ? Constants.SERVICE_RELIABILITY_ADJUSTMENT : null;
     }
 
     /**

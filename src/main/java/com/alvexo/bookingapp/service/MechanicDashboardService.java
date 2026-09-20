@@ -11,9 +11,11 @@ import com.alvexo.bookingapp.model.*;
 import com.alvexo.bookingapp.repository.BookingRepository;
 import com.alvexo.bookingapp.repository.MechanicConfigurationSettingsRepository;
 import com.alvexo.bookingapp.repository.MechanicDailyOverrideRepository;
+import com.alvexo.bookingapp.repository.MechanicPromotionalOfferRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSlotRepository;
 import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
+import com.alvexo.bookingapp.repository.ReminderCycleRepository;
 import com.alvexo.bookingapp.repository.UserVehicleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,9 +37,6 @@ import java.util.stream.Collectors;
 @Service
 public class MechanicDashboardService {
 
-    private static final int DEFAULT_SERVICE_DUE_INTERVAL_DAYS = 90;
-    private static final int DEFAULT_SECOND_REMINDER_INTERVAL_DAYS = 15;
-
     private final MechanicSettingsRepository settingsRepository;
     private final MechanicServiceSettingRepository serviceSettingRepository;
     private final MechanicServiceSlotRepository serviceSlotRepository;
@@ -45,6 +44,9 @@ public class MechanicDashboardService {
     private final UserVehicleRepository userVehicleRepository;
     private final MechanicConfigurationSettingsRepository configurationSettingsRepository;
     private final MechanicDailyOverrideRepository dailyOverrideRepository;
+    private final MechanicPromotionalOfferRepository promotionalOfferRepository;
+    private final ReminderCycleRepository reminderCycleRepository;
+    private final ReminderCycleService reminderCycleService;
 
     public MechanicDashboardService(MechanicSettingsRepository settingsRepository,
                                      MechanicServiceSettingRepository serviceSettingRepository,
@@ -52,14 +54,20 @@ public class MechanicDashboardService {
                                      BookingRepository bookingRepository,
                                      UserVehicleRepository userVehicleRepository,
                                      MechanicConfigurationSettingsRepository configurationSettingsRepository,
-                                     MechanicDailyOverrideRepository dailyOverrideRepository) {
+                                     MechanicDailyOverrideRepository dailyOverrideRepository,
+                                     MechanicPromotionalOfferRepository promotionalOfferRepository,
+                                     ReminderCycleRepository reminderCycleRepository,
+                                     ReminderCycleService reminderCycleService) {
         this.settingsRepository = settingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
         this.serviceSlotRepository = serviceSlotRepository;
         this.bookingRepository = bookingRepository;
         this.userVehicleRepository = userVehicleRepository;
         this.configurationSettingsRepository = configurationSettingsRepository;
+        this.reminderCycleRepository = reminderCycleRepository;
+        this.reminderCycleService = reminderCycleService;
         this.dailyOverrideRepository = dailyOverrideRepository;
+        this.promotionalOfferRepository = promotionalOfferRepository;
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +120,7 @@ public class MechanicDashboardService {
                 .capacityUtilizationPercent(utilization)
                 .serviceBreakdown(serviceBreakdown)
                 .slots(slots)
+                .stats(computeStats(mechanic))
                 .build();
     }
 
@@ -172,17 +181,8 @@ public class MechanicDashboardService {
      * also passes + secondReminderIntervalDays. Uses the mechanic's
      * configuration settings if set up, else the documented defaults (90/15).
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ServiceReminderResponse> getServiceReminders(User mechanic) {
-        int serviceDueIntervalDays = DEFAULT_SERVICE_DUE_INTERVAL_DAYS;
-        int secondReminderIntervalDays = DEFAULT_SECOND_REMINDER_INTERVAL_DAYS;
-
-        var configOpt = configurationSettingsRepository.findByMechanic(mechanic);
-        if (configOpt.isPresent()) {
-            serviceDueIntervalDays = configOpt.get().getServiceDueIntervalDays();
-            secondReminderIntervalDays = configOpt.get().getSecondReminderIntervalDays();
-        }
-
         List<Booking> completed = bookingRepository.findCompletedBookingsByMechanicOrderByCompletedAtDesc(mechanic);
 
         // Keep only the most recent completed booking per vehicle (list is already ordered desc).
@@ -191,26 +191,42 @@ public class MechanicDashboardService {
             latestPerVehicle.putIfAbsent(b.getVehicle().getId(), b);
         }
 
+        LocalDateTime now = LocalDateTime.now();
         LocalDate today = LocalDate.now();
-        final int dueThreshold = serviceDueIntervalDays;
-        final int secondReminderThreshold = serviceDueIntervalDays + secondReminderIntervalDays;
 
         return latestPerVehicle.values().stream()
                 .map(b -> {
-                    LocalDate lastServiceDate = b.getCompletedAt().toLocalDate();
-                    int daysSince = (int) ChronoUnit.DAYS.between(lastServiceDate, today);
-                    ReminderStage stage = daysSince >= secondReminderThreshold ? ReminderStage.SECOND_REMINDER
-                            : daysSince >= dueThreshold ? ReminderStage.DUE : null;
+                    // Legacy safety net: guarantees a cycle exists even for completions that
+                    // predate this feature, or slipped past some other completion path.
+                    reminderCycleService.ensureCycleForCompletedBooking(b);
+                    ReminderCycle cycle = reminderCycleRepository
+                            .findOpenCycle(mechanic, b.getVehicle(), b.getVehicleUser())
+                            .orElse(null);
+                    if (cycle == null || cycle.getStatus() == ReminderCycleStatus.SECOND_SENT) {
+                        return null; // nothing left to remind about
+                    }
+
+                    ReminderStage stage;
+                    if (cycle.getFirstReminderSentAt() == null) {
+                        stage = today.isBefore(cycle.getScheduledServiceDate()) ? null : ReminderStage.DUE;
+                    } else if (cycle.getSecondReminderScheduledAt() != null
+                            && !now.isBefore(cycle.getSecondReminderScheduledAt())) {
+                        stage = ReminderStage.SECOND_REMINDER;
+                    } else {
+                        stage = null; // first already sent, second window hasn't opened yet
+                    }
                     if (stage == null) {
                         return null;
                     }
 
+                    LocalDate lastServiceDate = b.getCompletedAt().toLocalDate();
                     String registrationNumber = userVehicleRepository
                             .findByUserAndVehicle(b.getVehicleUser(), b.getVehicle())
                             .map(uv -> uv.getRegistrationNumber())
                             .orElse(null);
 
                     return ServiceReminderResponse.builder()
+                            .reminderCycleId(cycle.getId())
                             .vehicleId(b.getVehicle().getId())
                             .vehicleRegistrationNumber(registrationNumber)
                             .vehicleInfo(b.getVehicle().getMake() + " " + b.getVehicle().getModel())
@@ -218,12 +234,49 @@ public class MechanicDashboardService {
                             .customerName(b.getVehicleUser().getFirstName() + " " + b.getVehicleUser().getLastName())
                             .customerPhone(b.getVehicleUser().getMobileNumber())
                             .lastServiceDate(lastServiceDate)
-                            .daysSinceService(daysSince)
+                            .daysSinceService((int) ChronoUnit.DAYS.between(lastServiceDate, today))
                             .reminderStage(stage)
+                            .scheduledServiceDate(cycle.getScheduledServiceDate())
+                            .firstReminderPlannedAt(cycle.getFirstReminderPlannedAt())
+                            .firstReminderSentAt(cycle.getFirstReminderSentAt())
+                            .secondReminderScheduledAt(cycle.getSecondReminderScheduledAt())
+                            .secondReminderSentAt(cycle.getSecondReminderSentAt())
                             .build();
                 })
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * All-time dashboard aggregates (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §12).
+     * Never invents a value: fields are null when there's nothing to compute from yet.
+     */
+    private MechanicDashboardResponse.Stats computeStats(User mechanic) {
+        long totalBookings = bookingRepository.countByMechanic(mechanic);
+
+        BigDecimal cancellationAfterCutoffPercent = null;
+        if (totalBookings > 0) {
+            LocalTime cutoff = configurationSettingsRepository.findByMechanic(mechanic)
+                    .map(MechanicConfigurationSettings::getRescheduleCutoffTime)
+                    .orElse(null);
+            if (cutoff != null) {
+                long cancelledAfterCutoff = bookingRepository.findCancelledBookingsByMechanic(mechanic).stream()
+                        .filter(b -> b.getCancelledAt().toLocalTime().isAfter(cutoff))
+                        .count();
+                cancellationAfterCutoffPercent = BigDecimal.valueOf(cancelledAfterCutoff)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(totalBookings), 2, RoundingMode.HALF_UP);
+            }
+        }
+
+        Integer activePromotionalOffers = promotionalOfferRepository
+                .findActiveOffers(mechanic.getId(), LocalDate.now()).size();
+
+        return MechanicDashboardResponse.Stats.builder()
+                .totalBookingsTillDate(totalBookings)
+                .cancellationAfterCutoffPercent(cancellationAfterCutoffPercent)
+                .activePromotionalOffers(activePromotionalOffers)
+                .build();
     }
 
     private BigDecimal computeCapacityUtilization(User mechanic, MechanicSettings settings, LocalDate date,

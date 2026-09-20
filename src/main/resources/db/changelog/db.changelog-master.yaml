@@ -92,3 +92,12 @@ databaseChangeLog:
           file: db/changelog/changes/046-add-service-allocations-to-mechanic-settings.yaml
   - include:
           file: db/changelog/changes/047-create-mechanic-settings-restore-points-table.yaml
+  # ── Full App Backend Requirements (Workshop + Rider) ──────────────────────────
+  - include:
+          file: db/changelog/changes/048-widen-settlement-status-column.yaml
+  - include:
+          file: db/changelog/changes/049-add-idempotency-key-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/050-add-today-approval-fields-to-bookings.yaml
+  - include:
+          file: db/changelog/changes/051-create-reminder-cycles-table.yaml

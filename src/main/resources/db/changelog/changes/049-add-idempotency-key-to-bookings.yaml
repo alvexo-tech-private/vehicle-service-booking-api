@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 049-add-idempotency-key-to-bookings
+      author: system
+      comment: >
+        Atomic Instant Booking (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §4) —
+        de-duplicates a POST /api/bookings retried after a dropped response.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: idempotency_key
+                  type: VARCHAR(100)
+        - addUniqueConstraint:
+            tableName: bookings
+            columnNames: idempotency_key
+            constraintName: uq_bookings_idempotency_key
+      rollback:
+        - dropUniqueConstraint:
+            tableName: bookings
+            constraintName: uq_bookings_idempotency_key
+        - dropColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: idempotency_key

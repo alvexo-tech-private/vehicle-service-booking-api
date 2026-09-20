@@ -36,11 +36,15 @@ import java.util.stream.Collectors;
  *
  * Settlements have no separate write path from the app side — a row is
  * materialized lazily the first time it's asked for, from that day's booking
- * data (advancePaid + reliabilityAdjustmentAmount), for any date strictly
- * before today. "Today" is never settled here; that's the live Earnings tab's
- * job. Once created, a settlement's netPay/adjustment are frozen — later
- * edits to a booking don't retroactively change a payout that's already been
- * computed, same as a real settlement wouldn't be silently rewritten.
+ * advance data, for any date strictly before today. "Today" is never settled
+ * here; that's the live Earnings tab's job. Net pay = advance collected minus
+ * a flat ₹{@link Constants#ADVANCE_HANDLING_FEE} handling fee per
+ * advance-carrying booking — no other workshop fee, and no cancellation
+ * penalty of any kind (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §10).
+ * A day with zero advance collected produces no settlement row at all. Once
+ * created, a settlement's netPay/fee are frozen — later edits to a booking
+ * don't retroactively change a payout that's already been computed, same as
+ * a real settlement wouldn't be silently rewritten.
  */
 @Service
 public class SettlementService {
@@ -157,29 +161,26 @@ public class SettlementService {
     // ── §5: FAQ (static — low priority per spec, revisit if copy needs to change without a release) ──
 
     public List<SettlementFaqEntryResponse> getFaq() {
-        String cap = Constants.SETTLEMENT_DAILY_ADJUSTMENT_CAP.stripTrailingZeros().toPlainString();
-        String perOccurrence = Constants.SERVICE_RELIABILITY_ADJUSTMENT.stripTrailingZeros().toPlainString();
-        String suspension = Constants.SETTLEMENT_SUSPENSION_THRESHOLD.stripTrailingZeros().toPlainString();
+        String fee = Constants.ADVANCE_HANDLING_FEE.stripTrailingZeros().toPlainString();
         return List.of(
                 SettlementFaqEntryResponse.builder()
-                        .question("Why was money deducted from my settlement?")
-                        .answer("A ₹" + perOccurrence + " Service Reliability Adjustment applies to each booking "
-                                + "cancelled, marked no-show, or flagged for a quality complaint after the "
-                                + "reschedule cutoff time, capped at ₹" + cap + " per day.")
+                        .question("Why is my settlement less than the total advance collected?")
+                        .answer("A flat ₹" + fee + " advance-handling fee is deducted per booking that collected "
+                                + "an advance. There is no fee on bookings with zero advance, and cancellations "
+                                + "never affect your settlement.")
                         .build(),
                 SettlementFaqEntryResponse.builder()
                         .question("How is my settlement released amount calculated?")
-                        .answer("settlementReleased = max(0, netPay - serviceReliabilityAdjustment) for that "
-                                + "service day.")
+                        .answer("settlementReleased = advanceCollected − (₹" + fee + " × number of bookings with "
+                                + "an advance) for that service day.")
                         .build(),
                 SettlementFaqEntryResponse.builder()
                         .question("When do I get paid?")
                         .answer("Settlements are released within 2 working days of the service day completing.")
                         .build(),
                 SettlementFaqEntryResponse.builder()
-                        .question("What happens if my adjustments add up?")
-                        .answer("Accumulating ₹" + suspension + " in adjustments suspends new bookings pending "
-                                + "review.")
+                        .question("What if no bookings that day collected an advance?")
+                        .answer("No settlement is generated for that day — it won't appear as a pending payout.")
                         .build()
         );
     }
@@ -190,9 +191,9 @@ public class SettlementService {
     public SettlementQueryResponse submitQuery(User mechanic, SettlementQueryRequest request) {
         validateRole(mechanic);
         Settlement settlement = settlementRepository
-                .findByMechanicAndSettlementDate(mechanic, request.getSettlementDate())
+                .findByIdAndMechanic(request.getSettlementId(), mechanic)
                 .orElseThrow(() -> new BadRequestException(
-                        "No settlement found for " + request.getSettlementDate()));
+                        "No settlement found with id " + request.getSettlementId()));
 
         LocalDateTime now = LocalDateTime.now();
         SettlementQuery query = SettlementQuery.builder()
@@ -270,29 +271,33 @@ public class SettlementService {
         if (settlementRepository.findByMechanicAndSettlementDate(mechanic, date).isPresent()) {
             return;
         }
-        List<Booking> bookings = bookingRepository.findEarningsBookings(mechanic, date);
+        List<Booking> bookings = bookingRepository.findDailyAdvanceSummaryBookings(mechanic, date);
         if (bookings.isEmpty()) {
             return;
         }
 
-        BigDecimal netPay = bookings.stream()
+        BigDecimal advanceCollected = bookings.stream()
                 .map(Booking::getAdvancePaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal rawAdjustment = bookings.stream()
-                .map(Booking::getReliabilityAdjustmentAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal adjustment = rawAdjustment.min(Constants.SETTLEMENT_DAILY_ADJUSTMENT_CAP);
+        // No advance collected that day: skip entirely rather than materialize a misleading
+        // zero-value Pending row (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §10).
+        if (advanceCollected.signum() == 0) {
+            return;
+        }
 
-        BigDecimal released = netPay.subtract(adjustment).max(BigDecimal.ZERO);
+        long advanceBookingCount = bookings.stream()
+                .filter(b -> b.getAdvancePaid() != null && b.getAdvancePaid().signum() > 0)
+                .count();
+        BigDecimal handlingFee = Constants.ADVANCE_HANDLING_FEE.multiply(BigDecimal.valueOf(advanceBookingCount));
+        BigDecimal released = advanceCollected.subtract(handlingFee).max(BigDecimal.ZERO);
 
         Settlement settlement = Settlement.builder()
                 .mechanic(mechanic)
                 .settlementDate(date)
-                .netPay(netPay)
-                .serviceReliabilityAdjustment(adjustment)
+                .netPay(advanceCollected)
+                .serviceReliabilityAdjustment(handlingFee)
                 .settlementReleased(released)
                 .status(SettlementStatus.PENDING)
                 .build();

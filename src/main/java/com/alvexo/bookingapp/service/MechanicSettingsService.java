@@ -227,8 +227,19 @@ public class MechanicSettingsService {
     }
 
     private void validateSettingsRequest(MechanicSettingsRequest r) {
+        // The workshop app now only exposes Level 1 (Basic) / Level 2 (Advanced) — jobCardType
+        // MECHANIC (Level 3/4) is legacy-only; existing MECHANIC rows are left as-is, but no new
+        // save may produce one (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §1).
+        if (r.getJobCardType() == JobCardType.MECHANIC) {
+            throw new BadRequestException(
+                    "Only Level 1 (Basic) and Level 2 (Advanced) are supported — jobCardType MECHANIC is legacy-only");
+        }
         if (r.getJobCardType() == JobCardType.AUTO && Boolean.TRUE.equals(r.getReserveForSlots())) {
             throw new BadRequestException("reserveForSlots must be false when jobCardType is AUTO");
+        }
+        if (r.getJobCardType() == JobCardType.AUTO && !Boolean.TRUE.equals(r.getReserveCapacity())
+                && (r.getMaxVehiclesPerDay() == null || r.getMaxVehiclesPerDay() < 1)) {
+            throw new BadRequestException("maxVehiclesPerDay must be a positive number for Level 1 (Basic)");
         }
         if (Boolean.TRUE.equals(r.getReserveCapacity())) {
             if (r.getExpressReportingTime() == null) {

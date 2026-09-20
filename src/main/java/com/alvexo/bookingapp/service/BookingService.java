@@ -17,6 +17,7 @@ import com.alvexo.bookingapp.dto.request.BookingRequest;
 import com.alvexo.bookingapp.dto.request.WalkInBookingRequest;
 import com.alvexo.bookingapp.dto.response.BookingResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
+import com.alvexo.bookingapp.exception.BusinessRuleException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.Booking;
 import com.alvexo.bookingapp.model.BookingChannel;
@@ -37,7 +38,9 @@ import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
 import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
+import com.alvexo.bookingapp.repository.UserVehicleRepository;
 import com.alvexo.bookingapp.repository.VehicleRepository;
+import com.alvexo.bookingapp.util.Constants;
 
 @Service
 public class BookingService {
@@ -51,6 +54,8 @@ public class BookingService {
     private final NotificationService notificationService;
     private final MechanicHolidayService holidayService;
     private final MechanicDailyOverrideService dailyOverrideService;
+    private final UserVehicleRepository userVehicleRepository;
+    private final ReminderCycleService reminderCycleService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -61,7 +66,9 @@ public class BookingService {
             MechanicServiceSettingRepository serviceSettingRepository,
             NotificationService notificationService,
             MechanicHolidayService holidayService,
-            MechanicDailyOverrideService dailyOverrideService) {
+            MechanicDailyOverrideService dailyOverrideService,
+            UserVehicleRepository userVehicleRepository,
+            ReminderCycleService reminderCycleService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
@@ -69,8 +76,10 @@ public class BookingService {
         this.mechanicSettingsRepository = mechanicSettingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
         this.notificationService = notificationService;
+        this.reminderCycleService = reminderCycleService;
         this.holidayService = holidayService;
         this.dailyOverrideService = dailyOverrideService;
+        this.userVehicleRepository = userVehicleRepository;
     }
 
     /**
@@ -107,6 +116,18 @@ public class BookingService {
     @Transactional
     public BookingResponse createBooking(BookingRequest request, User vehicleUser) {
 
+        // 0. Idempotent replay: a retried submission with the same key returns the
+        // original booking instead of creating a duplicate (§4).
+        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
+            Optional<Booking> existing = bookingRepository.findByIdempotencyKey(request.getIdempotencyKey());
+            if (existing.isPresent()) {
+                if (!existing.get().getVehicleUser().getId().equals(vehicleUser.getId())) {
+                    throw new BadRequestException("This idempotency key was already used by another request");
+                }
+                return convertToResponse(existing.get());
+            }
+        }
+
         // 1. Validate mechanic
         User mechanic = userRepository.findById(request.getMechanicId())
                 .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found"));
@@ -114,9 +135,12 @@ public class BookingService {
             throw new BadRequestException("Selected user is not a mechanic");
         }
 
-        // 2. Validate vehicle
+        // 2. Validate vehicle, and that it's actually registered to this rider
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
+        if (!userVehicleRepository.existsByUserAndVehicle(vehicleUser, vehicle)) {
+            throw new BadRequestException("This vehicle is not registered to your account");
+        }
 
         // 3. Reject past-dated bookings
         if (request.getScheduledDateTime().isBefore(LocalDateTime.now())) {
@@ -146,12 +170,7 @@ public class BookingService {
             }
         }
 
-        // 7. Settings-aware capacity checks
-        BookingType bookingType = checkCapacityAndResolveBookingType(
-                mechanic, serviceSetting, bookingDate, request.getScheduledDateTime(),
-                request.getAdvancePaid(), settingsOpt);
-
-        // 7b. Pickup / drop (RIDER_BOOKING_TO_WORKSHOP.md §3.2) — required addresses when requested
+        // 6b. Pickup / drop (RIDER_BOOKING_TO_WORKSHOP.md §3.2) — required addresses when requested
         boolean pickupRequired = Boolean.TRUE.equals(request.getPickupRequired());
         boolean dropRequired = Boolean.TRUE.equals(request.getDropRequired());
         if (pickupRequired && isBlank(request.getPickupAddress())) {
@@ -160,6 +179,52 @@ public class BookingService {
         if (dropRequired && isBlank(request.getDeliveryAddress())) {
             throw new BadRequestException("deliveryAddress is required when dropRequired is true");
         }
+
+        // 6c. Today Approval two-stage flow (§5): rider explicitly requests approval instead
+        // of an instant booking. Deliberately skips the capacity check below — that's the
+        // whole point of asking the workshop to decide by hand. No capacity is reserved (and
+        // no advance is owed) until the workshop accepts and the rider then confirms.
+        if (Boolean.TRUE.equals(request.getTodayApprovalRequest())) {
+            Booking requestBooking = Booking.builder()
+                    .vehicleUser(vehicleUser)
+                    .mechanic(mechanic)
+                    .vehicle(vehicle)
+                    .serviceSetting(serviceSetting)
+                    .bookingNumber(generateBookingNumber())
+                    .scheduledDateTime(request.getScheduledDateTime())
+                    .status(BookingStatus.REQUESTED)
+                    .bookingType(BookingType.STANDARD)
+                    .channel(BookingChannel.RIDER_APP)
+                    .serviceType(request.getServiceType())
+                    .description(request.getDescription())
+                    .estimatedCost(request.getEstimatedCost())
+                    .estimatedDurationMinutes(serviceSetting != null
+                            ? serviceSetting.getDurationMinutes() : request.getEstimatedDurationMinutes())
+                    .advancePaid(BigDecimal.ZERO)
+                    .customerNotes(request.getCustomerNotes())
+                    .pickupRequired(pickupRequired)
+                    .pickupAddress(pickupRequired ? request.getPickupAddress() : null)
+                    .dropRequired(dropRequired)
+                    .deliveryAddress(dropRequired ? request.getDeliveryAddress() : null)
+                    .audioReference(request.getAudioReference())
+                    .engineOilReplacement(Boolean.TRUE.equals(request.getEngineOilReplacement()))
+                    .idempotencyKey(request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()
+                            ? request.getIdempotencyKey() : null)
+                    .build();
+            requestBooking = bookingRepository.save(requestBooking);
+
+            notificationService.createNotification(
+                    mechanic, "New Today Approval Request",
+                    "You have a new same-day approval request from " + vehicleUser.getFirstName(),
+                    NotificationType.BOOKING_CREATED, "Booking", requestBooking.getId());
+
+            return convertToResponse(requestBooking);
+        }
+
+        // 7. Settings-aware capacity checks
+        BookingType bookingType = checkCapacityAndResolveBookingType(
+                mechanic, serviceSetting, bookingDate, request.getScheduledDateTime(),
+                request.getAdvancePaid(), settingsOpt);
 
         // 8. PESSIMISTIC LOCK — concurrency layer 1
         List<Booking> conflicts = bookingRepository.findAndLockConflicting(
@@ -206,6 +271,8 @@ public class BookingService {
                 .deliveryAddress(dropRequired ? request.getDeliveryAddress() : null)
                 .audioReference(request.getAudioReference())
                 .engineOilReplacement(Boolean.TRUE.equals(request.getEngineOilReplacement()))
+                .idempotencyKey(request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()
+                        ? request.getIdempotencyKey() : null)
                 .build();
 
         if (autoConfirm && autoIssue) {
@@ -218,6 +285,12 @@ public class BookingService {
             if (e.getMessage() != null && e.getMessage().contains("uq_mechanic_slot")) {
                 throw new BadRequestException(
                         "This slot was just taken by another booking. Please choose a different time.");
+            }
+            if (e.getMessage() != null && e.getMessage().contains("uq_bookings_idempotency_key")) {
+                // Concurrent retry with the same key raced us — return the winner's booking.
+                return bookingRepository.findByIdempotencyKey(booking.getIdempotencyKey())
+                        .map(this::convertToResponse)
+                        .orElseThrow(() -> e);
             }
             throw e;
         }
@@ -417,6 +490,12 @@ public class BookingService {
 
     @Transactional
     public BookingResponse updateBookingStatus(Long bookingId, BookingStatus newStatus, User user) {
+        if (newStatus == BookingStatus.REQUESTED || newStatus == BookingStatus.PENDING_PAYMENT
+                || newStatus == BookingStatus.SCHEDULED || newStatus == BookingStatus.EXPIRED) {
+            throw new BadRequestException(
+                    newStatus + " is only set by the Today Approval flow (/workshop-decision, /confirm-request)");
+        }
+
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
@@ -445,6 +524,7 @@ public class BookingService {
             User mechanic = booking.getMechanic();
             mechanic.setTotalBookingsCompleted(mechanic.getTotalBookingsCompleted() + 1);
             userRepository.save(mechanic);
+            reminderCycleService.ensureCycleForCompletedBooking(booking);
         } else if (newStatus == BookingStatus.CANCELLED) {
             booking.setCancelledAt(LocalDateTime.now());
             booking.setCancelledBy(user);
@@ -659,6 +739,123 @@ public class BookingService {
         return convertToResponse(booking);
     }
 
+    // ── Today Approval two-stage flow (§5) ────────────────────────────────────
+
+    /**
+     * Workshop accepts or rejects a REQUESTED booking. Accepting does not reserve capacity or
+     * charge anything yet — it only starts a confirmation window during which the rider must
+     * call {@link #confirmRequest}.
+     */
+    @Transactional
+    public com.alvexo.bookingapp.dto.response.WorkshopDecisionResponse workshopDecision(
+            Long bookingId, User mechanic, boolean accept) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+            throw new BadRequestException("You don't have access to this booking");
+        }
+        if (booking.getStatus() != BookingStatus.REQUESTED) {
+            throw new BadRequestException("Only a REQUESTED booking can be accepted or rejected");
+        }
+
+        if (accept) {
+            Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(mechanic);
+            BigDecimal requiredAdvance = !Boolean.TRUE.equals(booking.getPickupRequired())
+                    && settingsOpt.map(MechanicSettings::getAdvanceEnabled).orElse(false)
+                    ? settingsOpt.get().getAdvanceAmount() : BigDecimal.ZERO;
+
+            booking.setStatus(BookingStatus.PENDING_PAYMENT);
+            booking.setRequiredAdvanceAmount(requiredAdvance);
+            booking.setConfirmationExpiresAt(
+                    LocalDateTime.now().plusMinutes(Constants.TODAY_APPROVAL_CONFIRMATION_WINDOW_MINUTES));
+            booking = bookingRepository.save(booking);
+
+            notificationService.createNotification(
+                    booking.getVehicleUser(), "Request Accepted",
+                    "Booking #" + booking.getBookingNumber() + " was accepted. Please confirm within "
+                            + Constants.TODAY_APPROVAL_CONFIRMATION_WINDOW_MINUTES + " minutes.",
+                    NotificationType.BOOKING_CONFIRMED, "Booking", booking.getId());
+
+            return new com.alvexo.bookingapp.dto.response.WorkshopDecisionResponse(
+                    booking.getId(), booking.getStatus(), booking.getConfirmationExpiresAt(), requiredAdvance);
+        }
+
+        booking.setStatus(BookingStatus.REJECTED);
+        booking = bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getVehicleUser(), "Request Rejected",
+                "Booking #" + booking.getBookingNumber() + " was rejected by the workshop.",
+                NotificationType.BOOKING_CANCELLED, "Booking", booking.getId());
+
+        return new com.alvexo.bookingapp.dto.response.WorkshopDecisionResponse(
+                booking.getId(), booking.getStatus(), null, null);
+    }
+
+    /**
+     * Rider confirms a workshop-accepted request. If no advance is owed, capacity is reserved
+     * and the booking moves straight to SCHEDULED. If an advance is still owed, capacity is
+     * deliberately NOT reserved yet — the rider must pay via /payment-intent first, then call
+     * this again once the payment is recorded.
+     */
+    @Transactional
+    public com.alvexo.bookingapp.dto.response.ConfirmRequestResponse confirmRequest(Long bookingId, User rider) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getVehicleUser().getId().equals(rider.getId())) {
+            throw new BadRequestException("You don't have access to this booking");
+        }
+
+        expireIfPastDeadline(booking);
+
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+            throw new BadRequestException(
+                    "There is nothing to confirm for this booking (status: " + booking.getStatus() + ")");
+        }
+
+        BigDecimal required = booking.getRequiredAdvanceAmount() != null
+                ? booking.getRequiredAdvanceAmount() : BigDecimal.ZERO;
+        BigDecimal paid = booking.getAdvancePaid() != null ? booking.getAdvancePaid() : BigDecimal.ZERO;
+
+        if (required.signum() > 0 && paid.compareTo(required) < 0) {
+            return new com.alvexo.bookingapp.dto.response.ConfirmRequestResponse(
+                    booking.getId(), booking.getStatus(), true, required.subtract(paid));
+        }
+
+        List<Booking> conflicts = bookingRepository.findAndLockConflicting(
+                booking.getMechanic(), booking.getScheduledDateTime());
+        if (!conflicts.isEmpty()) {
+            throw new BusinessRuleException("CAPACITY_UNAVAILABLE",
+                    "This slot is no longer available. Please choose a different time.");
+        }
+
+        booking.setStatus(BookingStatus.SCHEDULED);
+        booking.setConfirmationExpiresAt(null);
+        booking.setRequiredAdvanceAmount(null);
+        booking = bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getMechanic(), "Booking Confirmed",
+                "Booking #" + booking.getBookingNumber() + " was confirmed by the customer.",
+                NotificationType.BOOKING_CONFIRMED, "Booking", booking.getId());
+
+        return new com.alvexo.bookingapp.dto.response.ConfirmRequestResponse(
+                booking.getId(), booking.getStatus(), false, BigDecimal.ZERO);
+    }
+
+    /** Lazily transitions a lapsed PENDING_PAYMENT booking to EXPIRED on access (no background sweep exists). */
+    private void expireIfPastDeadline(Booking booking) {
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT
+                && booking.getConfirmationExpiresAt() != null
+                && booking.getConfirmationExpiresAt().isBefore(LocalDateTime.now())) {
+            booking.setStatus(BookingStatus.EXPIRED);
+            booking.setConfirmationExpiresAt(null);
+            bookingRepository.save(booking);
+        }
+    }
+
     /**
      * Manually issues a job card for a CONFIRMED booking whose mechanic has
      * autoIssue = false. No-op error if a job card already exists.
@@ -690,6 +887,7 @@ public class BookingService {
         return bookingRepository.findByVehicleUser(user, pageable).map(this::convertToResponse);
     }
 
+    @Transactional
     public BookingResponse getBookingById(Long id, User user) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
@@ -699,6 +897,10 @@ public class BookingService {
                 && user.getRole() != UserRole.ADMINISTRATOR) {
             throw new BadRequestException("You don't have access to this booking");
         }
+
+        // Lazy expiry — there's no background sweep, so a lapsed Today Approval window is
+        // only surfaced (and persisted) the next time the booking is read or acted on.
+        expireIfPastDeadline(booking);
 
         return convertToResponse(booking);
     }

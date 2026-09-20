@@ -79,7 +79,7 @@ public class ServiceDeskTodayController {
         return ResponseEntity.ok(MyApiResponse.success("Vehicle marked Arrived", response));
     }
 
-    @Operation(summary = "Cancel a booking", description = "Flags a ₹30 Service Reliability Adjustment when past the reschedule cutoff.")
+    @Operation(summary = "Cancel a booking", description = "No cancellation penalty is applied.")
     @PutMapping("/bookings/{bookingId}/cancel")
     public ResponseEntity<MyApiResponse<ServiceCancelResponse>> cancel(
             @PathVariable String bookingId,

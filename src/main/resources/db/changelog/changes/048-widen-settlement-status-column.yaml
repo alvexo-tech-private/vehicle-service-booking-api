@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 048-widen-settlement-status-column
+      author: system
+      comment: >
+        BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §10 adds the
+        NO_SETTLEMENT_REQUIRED status (23 chars), which doesn't fit VARCHAR(20).
+      changes:
+        - modifyDataType:
+            tableName: settlements
+            columnName: status
+            newDataType: VARCHAR(30)
+      rollback:
+        - modifyDataType:
+            tableName: settlements
+            columnName: status
+            newDataType: VARCHAR(20)

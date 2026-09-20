@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -44,15 +43,18 @@ public class ServiceDeskTodayService {
     private final UserVehicleRepository userVehicleRepository;
     private final MechanicConfigurationSettingsRepository configurationSettingsRepository;
     private final NotificationService notificationService;
+    private final ReminderCycleService reminderCycleService;
 
     public ServiceDeskTodayService(BookingRepository bookingRepository,
                                     UserVehicleRepository userVehicleRepository,
                                     MechanicConfigurationSettingsRepository configurationSettingsRepository,
-                                    NotificationService notificationService) {
+                                    NotificationService notificationService,
+                                    ReminderCycleService reminderCycleService) {
         this.bookingRepository = bookingRepository;
         this.userVehicleRepository = userVehicleRepository;
         this.configurationSettingsRepository = configurationSettingsRepository;
         this.notificationService = notificationService;
+        this.reminderCycleService = reminderCycleService;
     }
 
     @Transactional(readOnly = true)
@@ -177,7 +179,7 @@ public class ServiceDeskTodayService {
             throw new BadRequestException("A " + current + " booking cannot be cancelled");
         }
 
-        var reliabilityAdjustment = applyCancellation(booking, mechanic, message);
+        applyCancellation(booking, mechanic, message);
         bookingRepository.save(booking);
 
         notificationService.createNotification(
@@ -191,7 +193,6 @@ public class ServiceDeskTodayService {
         return ServiceCancelResponse.builder()
                 .bookingId(booking.getBookingNumber())
                 .cancellationMessage(booking.getCancellationMessage())
-                .reliabilityAdjustment(reliabilityAdjustment)
                 .build();
     }
 
@@ -251,25 +252,23 @@ public class ServiceDeskTodayService {
                 booking.setStatus(BookingStatus.COMPLETED);
                 booking.setServiceStage(null);
                 booking.setCompletedAt(LocalDateTime.now());
+                reminderCycleService.ensureCycleForCompletedBooking(booking);
             }
             default -> throw new IllegalArgumentException("Unsupported target status: " + target);
         }
     }
 
-    /** Shared by Today (§1.7) and Service Week (§2.5) cancellation. */
-    java.math.BigDecimal applyCancellation(Booking booking, User actor, String message) {
-        MechanicConfigurationSettings config = configurationSettingsRepository.findByMechanic(booking.getMechanic())
-                .orElse(null);
-        LocalTime cutoff = config != null ? config.getRescheduleCutoffTime() : null;
-        var reliabilityAdjustment = ServiceDeskMapper.computeReliabilityAdjustment(cutoff, LocalTime.now());
-
+    /**
+     * Shared by Today (§1.7) and Service Week (§2.5) cancellation. No cancellation penalty is
+     * applied (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §8 removed the Service Reliability
+     * Adjustment entirely).
+     */
+    void applyCancellation(Booking booking, User actor, String message) {
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setServiceStage(null);
         booking.setCancellationMessage(message);
         booking.setCancelledAt(LocalDateTime.now());
         booking.setCancelledBy(actor);
-        booking.setReliabilityAdjustmentAmount(reliabilityAdjustment);
-        return reliabilityAdjustment;
     }
 
     /** §1.4 transition table. */

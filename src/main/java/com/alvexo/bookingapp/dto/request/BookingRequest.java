@@ -59,4 +59,20 @@ public class BookingRequest {
     private String audioReference;
 
     private Boolean engineOilReplacement;
+
+    /**
+     * Client-generated key (e.g. a UUID) that de-duplicates a submission retried after a
+     * timeout/dropped-response. Replaying the same key returns the original booking instead
+     * of creating a second one (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §4).
+     */
+    @Size(max = 100, message = "idempotencyKey must be at most 100 characters")
+    private String idempotencyKey;
+
+    /**
+     * When true, submits a Today Approval request (status REQUESTED) instead of an instant
+     * booking — the workshop must accept/reject, and the rider then confirms
+     * (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §5). No capacity check runs at this
+     * stage and no advance is charged.
+     */
+    private Boolean todayApprovalRequest;
 }

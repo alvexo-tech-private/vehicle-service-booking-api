@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,22 +76,17 @@ public class PreferenceService {
     }
 
     /**
-     * Removes a mechanic from the vehicle user's preferences.
-     * Throws {@link ResourceNotFoundException} if the mechanic is not in their preferences.
+     * Removes a mechanic from the vehicle user's preferences. Idempotent — removing a mechanic
+     * that isn't (or is no longer) bookmarked is a silent no-op rather than a 404
+     * (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §2).
      */
     @Transactional
     public void removePreference(User vehicleUser, Long mechanicId) {
         User mechanic = userRepository.findById(mechanicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found with id: " + mechanicId));
 
-        Optional<UserMechanicPreference> preference =
-                preferenceRepository.findByVehicleUserAndMechanic(vehicleUser, mechanic);
-
-        if (preference.isEmpty()) {
-            throw new ResourceNotFoundException("Mechanic is not in your preferences");
-        }
-
-        preferenceRepository.delete(preference.get());
+        preferenceRepository.findByVehicleUserAndMechanic(vehicleUser, mechanic)
+                .ifPresent(preferenceRepository::delete);
     }
 
     private MechanicSearchResponse toSearchResponse(User user) {
@@ -116,7 +110,9 @@ public class PreferenceService {
                 user.getLatitude(),
                 user.getLongitude(),
                 java.util.List.of(),
-                null
+                null,
+                user.getProfileImageUrl(),
+                user.getActive()
         );
     }
 }

@@ -44,8 +44,6 @@ public class Constants {
     // Workshop profile — platform verification
     public static final int PLATFORM_VERIFICATION_MIN_METHODS = 2;
 
-    // Service Desk — cancellation past the reschedule cutoff (SERVICE_DESK_API_SPEC.md §1.7, BR-22/30)
-    public static final java.math.BigDecimal SERVICE_RELIABILITY_ADJUSTMENT = new java.math.BigDecimal("30.00");
     public static final String DEFAULT_CANCELLATION_MESSAGE =
             "Due to unavoidable circumstances, your service has been cancelled. "
             + "We are sorry for the inconvenience caused.";
@@ -61,12 +59,21 @@ public class Constants {
             "Lakshadweep", "Puducherry"
     );
 
-    // Settlement (WORKSHOP_FINANCE_API_SPEC.md §2)
-    public static final java.math.BigDecimal SETTLEMENT_DAILY_ADJUSTMENT_CAP = new java.math.BigDecimal("200.00");
-    public static final java.math.BigDecimal SETTLEMENT_SUSPENSION_THRESHOLD = new java.math.BigDecimal("1000.00");
+    // Settlement (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §6/§10) — flat handling fee
+    // deducted from the advance per booking; there is no other workshop fee and no penalty.
+    public static final java.math.BigDecimal ADVANCE_HANDLING_FEE = new java.math.BigDecimal("10.00");
     public static final int SETTLEMENT_CUSTOM_RANGE_MAX_DAYS = 7;
     public static final int SETTLEMENT_CUSTOM_RANGE_LOOKBACK_DAYS = 30;
     public static final int SETTLEMENT_LATEST_LOOKBACK_DAYS = 60;
+
+    // Rider payment contract (§6) — distinct ledger leg from ADVANCE_HANDLING_FEE: this is added
+    // to what the rider pays, the settlement fee is subtracted from what the workshop receives.
+    // Numerically identical today but tracked separately since they can diverge independently.
+    public static final java.math.BigDecimal RIDER_PLATFORM_FEE = new java.math.BigDecimal("10.00");
+
+    // Today Approval two-stage flow (§5) — how long a rider has to confirm/pay after the
+    // workshop accepts, before the request lapses back to EXPIRED.
+    public static final int TODAY_APPROVAL_CONFIRMATION_WINDOW_MINUTES = 15;
 
     private Constants() {
         // Private constructor to prevent instantiation

@@ -5,11 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-
 /**
- * Response of a Today/Service Week cancel action (§1.7/§2.5). reliabilityAdjustment
- * is populated only when the cancellation happened past the reschedule cutoff.
+ * Response of a Today/Service Week cancel action (§1.7/§2.5). No cancellation penalty is
+ * applied — cancelling never affects settlement/earnings.
  */
 @Data
 @Builder
@@ -18,5 +16,4 @@ import java.math.BigDecimal;
 public class ServiceCancelResponse {
     private String bookingId;
     private String cancellationMessage;
-    private BigDecimal reliabilityAdjustment;
 }

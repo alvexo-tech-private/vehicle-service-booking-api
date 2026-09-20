@@ -231,6 +231,27 @@ public class MechanicController {
         return ResponseEntity.ok(MyApiResponse.success(message, slots));
     }
 
+    @Operation(
+        summary = "Get booking availability for a date range",
+        description = """
+            Authoritative availability contract for a workshop + service + vehicle across a date
+            range (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §3). Each date carries
+            `available`, a stable `reasonCode` when not (CLOSED, HOLIDAY, PAUSE, FULL,
+            SERVICE_NOT_OFFERED, VEHICLE_NOT_SUPPORTED, SETTINGS_INCOMPLETE), the applicable
+            reporting time, and remaining vehicle-count capacity (null in hour-capacity mode).
+            """
+    )
+    @GetMapping("/{mechanicId}/booking-availability")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.BookingAvailabilityResponse>> getBookingAvailability(
+            @PathVariable Long mechanicId,
+            @RequestParam(required = false) com.alvexo.bookingapp.model.ServiceCategory serviceCategory,
+            @RequestParam(required = false) Long vehicleId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(MyApiResponse.success(
+                mechanicService.getBookingAvailability(mechanicId, serviceCategory, vehicleId, from, to)));
+    }
+
     // ── Nearby search ─────────────────────────────────────────────────────────
 
     @Operation(summary = "Find nearby mechanics",

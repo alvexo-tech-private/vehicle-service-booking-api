@@ -4,5 +4,7 @@ package com.alvexo.bookingapp.model;
 public enum SettlementStatus {
     PENDING,
     PROCESSING,
-    PAID
+    PAID,
+    /** No advance was collected that day — never appears as a misleading zero-value Pending row. */
+    NO_SETTLEMENT_REQUIRED
 }

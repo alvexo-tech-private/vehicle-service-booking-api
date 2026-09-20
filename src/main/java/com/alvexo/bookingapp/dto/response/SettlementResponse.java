@@ -15,7 +15,9 @@ public class SettlementResponse {
 
     private Long id;
     private LocalDate settlementDate;
+    /** Total advance collected across the day's bookings. */
     private BigDecimal netPay;
+    /** Flat advance-handling fee (field name kept for API compatibility — no longer a penalty). */
     private BigDecimal serviceReliabilityAdjustment;
     private BigDecimal settlementReleased;
     private SettlementStatus status;

@@ -49,4 +49,19 @@ public class MechanicDashboardResponse {
 
     /** Slot 1/2 cards (Type 4 only) — empty list otherwise. */
     private List<ServiceSlotSummaryResponse> slots;
+
+    /** All-time aggregates (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §12) — same regardless of {@code date}. */
+    private Stats stats;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Stats {
+        private Long totalBookingsTillDate;
+        /** Null (not zero) when the mechanic has no bookings yet — avoids implying a real 0%. */
+        private BigDecimal cancellationAfterCutoffPercent;
+        /** Null when promotional offers aren't configured/available — the frontend must not invent a value. */
+        private Integer activePromotionalOffers;
+    }
 }

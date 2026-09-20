@@ -128,9 +128,9 @@ public class Booking {
     private String cancellationMessage;
 
     /**
-     * ₹30 Service Reliability Adjustment (spec §1.7, BR-22/30) — set when this
-     * booking was cancelled after the mechanic's rescheduleCutoffTime. Feeds
-     * the Earnings tab's cancellation-deduction entries. Null = not applicable.
+     * Unused as of BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §8 — cancellation no longer
+     * carries any penalty. Column kept (always null going forward) rather than dropped, so any
+     * pre-existing historical values aren't destroyed.
      */
     @Column(name = "reliability_adjustment_amount", precision = 10, scale = 2)
     private BigDecimal reliabilityAdjustmentAmount;
@@ -206,6 +206,20 @@ public class Booking {
     @Column(name = "proposal_status", nullable = false, length = 20)
     @Builder.Default
     private BookingProposalStatus proposalStatus = BookingProposalStatus.NONE;
+
+    /** Client-supplied dedup key for POST /api/bookings (§4). Null for bookings created before this existed. */
+    @Column(name = "idempotency_key", unique = true, length = 100)
+    private String idempotencyKey;
+
+    // ── Today Approval two-stage flow (§5) ────────────────────────────────────
+
+    /** Set when the workshop accepts a REQUESTED booking; the rider must confirm before this passes. */
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+
+    /** Advance the workshop requires before confirming, decided at accept time. Null once paid/not applicable. */
+    @Column(name = "required_advance_amount", precision = 10, scale = 2)
+    private BigDecimal requiredAdvanceAmount;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

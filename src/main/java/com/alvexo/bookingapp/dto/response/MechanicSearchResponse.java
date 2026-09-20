@@ -28,5 +28,7 @@ public record MechanicSearchResponse(
         /** This workshop's configured vehicle makes across all categories. Empty if not configured. */
         List<String> supportedBrands,
         /** Relative to the query's ?vehicleMake= param. Null when no vehicleMake was requested. */
-        Boolean isBrandSupported
+        Boolean isBrandSupported,
+        String profileImageUrl,
+        Boolean active
 ) {}
