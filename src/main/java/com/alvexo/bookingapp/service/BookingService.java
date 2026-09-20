@@ -3,6 +3,7 @@ package com.alvexo.bookingapp.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,13 @@ import com.alvexo.bookingapp.util.Constants;
 
 @Service
 public class BookingService {
+
+    // Default working-hours fallback — applied when a workshop has no explicit
+    // mechanic_availability rows. Matches AuthService.seedDefaultAvailability().
+    private static final LocalTime DEFAULT_OPEN_START = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_OPEN_END   = LocalTime.of(18, 0);
+    private static final java.util.EnumSet<DayOfWeek> DEFAULT_CLOSED_DAYS =
+            java.util.EnumSet.of(DayOfWeek.SUNDAY);
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
@@ -156,6 +164,23 @@ public class BookingService {
         // 5. Load mechanic settings (optional — some mechanics may not have configured yet)
         Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(mechanic);
         LocalDate bookingDate = request.getScheduledDateTime().toLocalDate();
+
+        // 5b. For Instant bookings (todayApprovalRequest != true), auto-resolve the scheduled time
+        // from the workshop's API settings when the client sends a date-only or a time that is
+        // before the workshop's serviceReportingTime (e.g. midnight).
+        //
+        // Rules (WORKSHOP_SETTINGS_V2):
+        //  - Use workshop's serviceReportingTime as the target reporting time.
+        //  - If booking is today and serviceReportingTime has already passed,
+        //    round NOW up to the next 30-minute boundary so same-day Instant bookings always work.
+        if (!Boolean.TRUE.equals(request.getTodayApprovalRequest())) {
+            LocalDateTime resolvedDateTime = resolveInstantBookingTime(
+                    request.getScheduledDateTime(), settingsOpt);
+            // Replace the scheduled time in request with the resolved value.
+            // (BookingRequest is mutable; this avoids passing extra args everywhere below.)
+            request.setScheduledDateTime(resolvedDateTime);
+            bookingDate = resolvedDateTime.toLocalDate();
+        }
 
         // 6. Resolve service setting (if provided)
         MechanicServiceSetting serviceSetting = null;
@@ -921,7 +946,17 @@ public class BookingService {
                 .findByMechanicAndDayOfWeek(mechanic, dayOfWeek);
 
         if (rules.isEmpty()) {
-            throw new BadRequestException("Mechanic is not available on " + dayOfWeek);
+            // No explicit rows — use the same default-hours fallback that MechanicService uses.
+            if (DEFAULT_CLOSED_DAYS.contains(dayOfWeek)) {
+                throw new BadRequestException("Mechanic is not available on " + dayOfWeek);
+            }
+            LocalTime slotTime = scheduledDateTime.toLocalTime();
+            if (slotTime.isBefore(DEFAULT_OPEN_START) || slotTime.isAfter(DEFAULT_OPEN_END)) {
+                throw new BadRequestException(
+                        "The requested time is outside the mechanic's default working hours (" +
+                        DEFAULT_OPEN_START + " – " + DEFAULT_OPEN_END + ").");
+            }
+            return;
         }
 
         boolean withinAnyRule = rules.stream()
@@ -937,6 +972,53 @@ public class BookingService {
             throw new BadRequestException(
                     "The requested time is outside the mechanic's working hours for that day.");
         }
+    }
+
+    /**
+     * Resolves the scheduled date-time for an Instant booking from workshop settings.
+     *
+     * Algorithm:
+     *  1. If settings exist and have a serviceReportingTime, use the date portion of the
+     *     requested scheduledDateTime combined with the workshop's serviceReportingTime.
+     *  2. If the resulting time is in the past (same-day booking after reporting time),
+     *     round the current wall-clock time up to the next 30-minute boundary instead.
+     *  3. If settings are absent, return the original value unchanged.
+     */
+    private LocalDateTime resolveInstantBookingTime(
+            LocalDateTime requested, Optional<MechanicSettings> settingsOpt) {
+        if (settingsOpt.isEmpty()) {
+            return requested;
+        }
+        MechanicSettings settings = settingsOpt.get();
+        LocalTime reportingTime = settings.getServiceReportingTime();
+        if (reportingTime == null) {
+            return requested;
+        }
+
+        LocalDate bookingDate = requested.toLocalDate();
+        LocalDateTime candidateDateTime = bookingDate.atTime(reportingTime);
+
+        LocalDateTime now = LocalDateTime.now();
+        if (candidateDateTime.isAfter(now)) {
+            // Reporting time is still in the future — use it directly.
+            return candidateDateTime;
+        }
+
+        if (bookingDate.isEqual(LocalDate.now())) {
+            // Same-day Instant booking and reporting time has passed — round up to next 30-min slot.
+            int minute = now.getMinute();
+            int roundedMinute = (minute / 30 + 1) * 30;
+            LocalDateTime nextHalfHour;
+            if (roundedMinute >= 60) {
+                nextHalfHour = now.withMinute(0).withSecond(0).withNano(0).plusHours(1);
+            } else {
+                nextHalfHour = now.withMinute(roundedMinute).withSecond(0).withNano(0);
+            }
+            return nextHalfHour;
+        }
+
+        // Future date but reporting time computed as past (clock skew?) — keep the workshop's time.
+        return candidateDateTime;
     }
 
     /**

@@ -76,6 +76,10 @@ public class MechanicSettingsService {
         validateRole(mechanic);
         MechanicSettings settings = settingsRepository.findByMechanic(mechanic)
                 .orElseThrow(() -> new ResourceNotFoundException("Settings not configured yet"));
+        // Normalize any legacy Level 3/4 rows to Level 2 (Advanced) transparently.
+        // The DB migration (052) handles existing rows at startup, but this guard
+        // ensures even rows that pre-date the migration read cleanly.
+        normalizeLegacyLevel(settings);
         return buildResponse(settings);
     }
 
@@ -83,6 +87,7 @@ public class MechanicSettingsService {
     public MechanicSettingsResponse getSettingsByMechanicId(Long mechanicId) {
         MechanicSettings settings = settingsRepository.findByMechanicId(mechanicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Settings not found for mechanic " + mechanicId));
+        normalizeLegacyLevel(settings);
         return buildResponse(settings);
     }
 
@@ -227,12 +232,14 @@ public class MechanicSettingsService {
     }
 
     private void validateSettingsRequest(MechanicSettingsRequest r) {
-        // The workshop app now only exposes Level 1 (Basic) / Level 2 (Advanced) — jobCardType
-        // MECHANIC (Level 3/4) is legacy-only; existing MECHANIC rows are left as-is, but no new
-        // save may produce one (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §1).
+        // Workshop Settings v2: only Level 1 (Basic) — jobCardType=AUTO, reserveCapacity=false
+        // and Level 2 (Advanced) — jobCardType=AUTO, reserveCapacity=true — are accepted.
+        // Level 3/4 (jobCardType=MECHANIC) are legacy-only; the DB migration (052) migrates
+        // existing rows and the API boundary below prevents new ones from being created.
         if (r.getJobCardType() == JobCardType.MECHANIC) {
             throw new BadRequestException(
-                    "Only Level 1 (Basic) and Level 2 (Advanced) are supported — jobCardType MECHANIC is legacy-only");
+                    "Only Level 1 (Basic) and Level 2 (Advanced) are supported. " +
+                    "jobCardType MECHANIC (Level 3/4) is no longer accepted.");
         }
         if (r.getJobCardType() == JobCardType.AUTO && Boolean.TRUE.equals(r.getReserveForSlots())) {
             throw new BadRequestException("reserveForSlots must be false when jobCardType is AUTO");
@@ -279,10 +286,10 @@ public class MechanicSettingsService {
     }
 
     /**
-     * Level 1 -> TYPE_1 (AUTO,     reserveCapacity=false)
-     * Level 2 -> TYPE_2 (AUTO,     reserveCapacity=true)
-     * Level 3 -> TYPE_3 (MECHANIC, reserveForSlots=false)
-     * Level 4 -> TYPE_4 (MECHANIC, reserveForSlots=true)
+     * Level 1 -> TYPE_1 (AUTO, reserveCapacity=false)
+     * Level 2 -> TYPE_2 (AUTO, reserveCapacity=true)
+     * Level 3/4 (MECHANIC) are legacy and no longer created; any existing rows are
+     * normalized to Level 2 via normalizeLegacyLevel().
      */
     private WorkshopClassification deriveClassification(JobCardType jobCardType,
                                                           Boolean reserveCapacity,
@@ -290,7 +297,36 @@ public class MechanicSettingsService {
         if (jobCardType == JobCardType.AUTO) {
             return Boolean.TRUE.equals(reserveCapacity) ? WorkshopClassification.TYPE_2 : WorkshopClassification.TYPE_1;
         }
-        return Boolean.TRUE.equals(reserveForSlots) ? WorkshopClassification.TYPE_4 : WorkshopClassification.TYPE_3;
+        // Should not reach here post-migration; treat as Level 2 (Advanced) for safety.
+        return WorkshopClassification.TYPE_2;
+    }
+
+    /**
+     * In-memory normalization of a legacy Level 3 (TYPE_3) or Level 4 (TYPE_4) settings
+     * entity to Level 2 (Advanced — TYPE_2). Does NOT persist — the DB migration handles
+     * persisted rows. This is a read-path safety guard for rows that may have been inserted
+     * before the migration ran, or in test environments.
+     *
+     * Rules:
+     *  - jobCardType  → AUTO
+     *  - reserveCapacity → true (enables hour-slot mode)
+     *  - reserveForSlots → false
+     *  - classification  → TYPE_2
+     *  - fullDayCapacityHours → kept as-is if present; defaulted to 8h if null
+     */
+    private void normalizeLegacyLevel(MechanicSettings s) {
+        if (s.getJobCardType() != JobCardType.MECHANIC
+                && s.getClassification() != WorkshopClassification.TYPE_3
+                && s.getClassification() != WorkshopClassification.TYPE_4) {
+            return; // already Level 1 or Level 2 — nothing to do
+        }
+        s.setJobCardType(JobCardType.AUTO);
+        s.setReserveCapacity(true);
+        s.setReserveForSlots(false);
+        s.setClassification(WorkshopClassification.TYPE_2);
+        if (s.getFullDayCapacityHours() == null) {
+            s.setFullDayCapacityHours(java.math.BigDecimal.valueOf(8));
+        }
     }
 
     /**

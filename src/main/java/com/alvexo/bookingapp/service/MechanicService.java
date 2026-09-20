@@ -37,6 +37,14 @@ public class MechanicService {
 
     private static final int MAX_AVAILABILITY_RANGE_DAYS = 31;
 
+    // Default working hours applied when a workshop has no explicit mechanic_availability rows.
+    // Mirrors the seed seeded by AuthService.seedDefaultAvailability() for new registrations.
+    private static final LocalTime DEFAULT_OPEN_START  = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_OPEN_END    = LocalTime.of(18, 0);
+    // Sunday is the only default-closed day; Mon–Sat default to open.
+    private static final java.util.EnumSet<DayOfWeek> DEFAULT_CLOSED_DAYS =
+            java.util.EnumSet.of(DayOfWeek.SUNDAY);
+
     @Autowired private MechanicAvailabilityRepository availabilityRepository;
     @Autowired private BookingRepository bookingRepository;
     @Autowired private UserRepository userRepository;
@@ -207,11 +215,19 @@ public class MechanicService {
 
         String serviceNotOfferedReason = null;
         if (serviceCategory != null) {
-            boolean offered = serviceSettingRepository.findByMechanicAndIsActiveTrueOrderByDisplayOrderAsc(mechanic)
-                    .stream().anyMatch(s -> s.getCategory() == serviceCategory);
-            if (!offered) {
-                serviceNotOfferedReason = "SERVICE_NOT_OFFERED";
+            // Only block the date range when the workshop explicitly has a custom service catalog
+            // AND that catalog doesn't contain the requested category.
+            // Basic (Level 1) workshops with an empty catalog are always open for standard services.
+            List<MechanicServiceSetting> activeServices =
+                    serviceSettingRepository.findByMechanicAndIsActiveTrueOrderByDisplayOrderAsc(mechanic);
+            boolean hasCustomCatalog = !activeServices.isEmpty();
+            if (hasCustomCatalog) {
+                boolean offered = activeServices.stream().anyMatch(s -> s.getCategory() == serviceCategory);
+                if (!offered) {
+                    serviceNotOfferedReason = "SERVICE_NOT_OFFERED";
+                }
             }
+            // If no catalog rows exist, leave serviceNotOfferedReason null → workshop remains bookable.
         }
 
         String vehicleNotSupportedReason = null;
@@ -249,8 +265,18 @@ public class MechanicService {
         }
 
         DayOfWeek dayOfWeek = DayOfWeek.valueOf(date.getDayOfWeek().name());
-        boolean openThatDay = availabilityRepository.findByMechanicAndDayOfWeek(mechanic, dayOfWeek).stream()
-                .anyMatch(r -> Boolean.TRUE.equals(r.getIsAvailable()));
+        List<MechanicAvailability> availRows =
+                availabilityRepository.findByMechanicAndDayOfWeek(mechanic, dayOfWeek);
+
+        boolean openThatDay;
+        if (availRows.isEmpty()) {
+            // No explicit availability rows seeded yet — apply default working hours:
+            // Mon–Sat open, Sunday closed. This prevents newly registered workshops from
+            // appearing fully closed before they configure their schedule.
+            openThatDay = !DEFAULT_CLOSED_DAYS.contains(dayOfWeek);
+        } else {
+            openThatDay = availRows.stream().anyMatch(r -> Boolean.TRUE.equals(r.getIsAvailable()));
+        }
         if (!openThatDay) {
             return new BookingAvailabilityDateResponse(date, false, "CLOSED", null, null, List.of());
         }

@@ -101,3 +101,6 @@ databaseChangeLog:
           file: db/changelog/changes/050-add-today-approval-fields-to-bookings.yaml
   - include:
           file: db/changelog/changes/051-create-reminder-cycles-table.yaml
+  # ── Workshop Settings v2 — Level 1 (Basic) / Level 2 (Advanced) only ─────────
+  - include:
+          file: db/changelog/changes/052-migrate-legacy-level3-4-to-level2.yaml

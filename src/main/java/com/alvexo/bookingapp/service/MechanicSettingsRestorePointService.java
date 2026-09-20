@@ -45,6 +45,11 @@ public class MechanicSettingsRestorePointService {
 
         MechanicSettingsRequest settingsSnapshot = settingsRepository.findByMechanic(mechanic)
                 .map(this::toSnapshot).orElse(null);
+        // Ensure any legacy Level 3/4 snapshot is normalized to Level 2 (Advanced)
+        // so restore points never perpetuate the old mechanic-card modes.
+        if (settingsSnapshot != null) {
+            normalizeLegacyLevelInSnapshot(settingsSnapshot);
+        }
         MechanicConfigurationSettingsRequest configSnapshot = configRepository.findByMechanic(mechanic)
                 .map(this::toSnapshot).orElse(null);
 
@@ -78,7 +83,10 @@ public class MechanicSettingsRestorePointService {
                 .orElseThrow(() -> new ResourceNotFoundException("Restore point not found"));
 
         if (restorePoint.getSettingsSnapshot() != null) {
-            settingsService.saveSettings(mechanic, restorePoint.getSettingsSnapshot());
+            MechanicSettingsRequest snapshot = restorePoint.getSettingsSnapshot();
+            // Normalize legacy Level 3/4 snapshots saved before the v2 migration ran.
+            normalizeLegacyLevelInSnapshot(snapshot);
+            settingsService.saveSettings(mechanic, snapshot);
         }
         if (restorePoint.getConfigurationSnapshot() != null) {
             configService.saveConfiguration(mechanic, restorePoint.getConfigurationSnapshot());
@@ -130,5 +138,21 @@ public class MechanicSettingsRestorePointService {
         r.setServiceDueIntervalDays(c.getServiceDueIntervalDays());
         r.setSecondReminderIntervalDays(c.getSecondReminderIntervalDays());
         return r;
+    }
+
+    /**
+     * Normalizes a MechanicSettingsRequest snapshot in-place from Level 3/4
+     * (jobCardType=MECHANIC) to Level 2 (Advanced — AUTO, reserveCapacity=true).
+     * Called both when saving a new restore point and when applying an old one.
+     */
+    private void normalizeLegacyLevelInSnapshot(MechanicSettingsRequest r) {
+        if (r.getJobCardType() == com.alvexo.bookingapp.model.JobCardType.MECHANIC) {
+            r.setJobCardType(com.alvexo.bookingapp.model.JobCardType.AUTO);
+            r.setReserveCapacity(true);
+            r.setReserveForSlots(false);
+            if (r.getFullDayCapacityHours() == null) {
+                r.setFullDayCapacityHours(java.math.BigDecimal.valueOf(8));
+            }
+        }
     }
 }
