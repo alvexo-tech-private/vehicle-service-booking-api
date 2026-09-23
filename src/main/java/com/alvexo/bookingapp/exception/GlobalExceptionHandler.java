@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -63,6 +64,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<MyApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(MyApiResponse.error("Access denied"));
+    }
+
+    /**
+     * Covers BadCredentialsException, UsernameNotFoundException, DisabledException,
+     * LockedException, etc. thrown by AuthenticationManager.authenticate() during login.
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<MyApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(MyApiResponse.error("Invalid credentials"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

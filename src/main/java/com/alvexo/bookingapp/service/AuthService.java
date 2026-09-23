@@ -250,15 +250,15 @@ public class AuthService {
     
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
-
         // If the username looks like a phone number (no @), normalise it before lookup
         String username = request.getUsername();
         String normalizedUsername = !username.contains("@")
                 ? MobileNumberUtil.normalize(username)
                 : username;
+
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(normalizedUsername, request.getPassword())
+        );
 
         User user = userRepository.findByEmail(normalizedUsername)
                 .or(() -> userRepository.findByMobileNumber(normalizedUsername))
