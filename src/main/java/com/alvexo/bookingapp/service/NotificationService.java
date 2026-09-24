@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alvexo.bookingapp.exception.BusinessRuleException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.Notification;
 import com.alvexo.bookingapp.model.NotificationType;
@@ -121,22 +122,18 @@ public class NotificationService {
     }
     
     // ── Contact-detail change OTP delivery ────────────────────────────────────
+    // Sent via the SendGrid HTTP API rather than JavaMailSender/SMTP: Render
+    // blocks outbound SMTP ports (25/465/587), so a direct SMTP send always
+    // times out there regardless of mail config.
 
     /**
      * Sends an OTP to the user's <em>new</em> email address so they can prove
      * ownership before the address is committed to the account.
      */
     public void sendEmailChangeOtp(String newEmail, String otp) {
-        if (mailSender == null) {
-            System.err.println("Mail sender not configured. Cannot send email change OTP.");
-            return;
-        }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(newEmail);
-        message.setSubject("Verify your new email address");
-        message.setText("Your OTP to verify your new email address is: " + otp
-                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
-        mailSender.send(message);
+        sendOtpViaSendGrid(newEmail, "Verify your new email address",
+                "Your OTP to verify your new email address is: " + otp
+                        + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
     }
 
     /**
@@ -144,16 +141,9 @@ public class NotificationService {
      * authorise a mobile number change. (SMS delivery is not yet implemented.)
      */
     public void sendMobileChangeOtp(String currentEmail, String otp) {
-        if (mailSender == null) {
-            System.err.println("Mail sender not configured. Cannot send mobile change OTP.");
-            return;
-        }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(currentEmail);
-        message.setSubject("Verify your new mobile number");
-        message.setText("Your OTP to verify your new mobile number is: " + otp
-                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
-        mailSender.send(message);
+        sendOtpViaSendGrid(currentEmail, "Verify your new mobile number",
+                "Your OTP to verify your new mobile number is: " + otp
+                        + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
     }
 
     /**
@@ -161,16 +151,31 @@ public class NotificationService {
      * (SMS/WhatsApp delivery is not yet implemented — delivered via the owner's account email.)
      */
     public void sendWhatsappVerificationOtp(String accountEmail, String otp) {
-        if (mailSender == null) {
-            System.err.println("Mail sender not configured. Cannot send WhatsApp verification OTP.");
-            return;
+        sendOtpViaSendGrid(accountEmail, "Verify your WhatsApp number",
+                "Your OTP to verify your WhatsApp number is: " + otp
+                        + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
+    }
+
+    private void sendOtpViaSendGrid(String toAddress, String subject, String body) {
+        Email from = new Email(fromEmail);
+        Email to = new Email(toAddress);
+        Content content = new Content("text/plain", body);
+        Mail mail = new Mail(from, subject, to, content);
+
+        SendGrid sg = new SendGrid(sendGridApiKey);
+        Request request = new Request();
+        request.setMethod(Method.POST);
+        request.setEndpoint("mail/send");
+        try {
+            request.setBody(mail.build());
+            Response response = sg.api(request);
+            if (response.getStatusCode() >= 400) {
+                throw new BusinessRuleException("EMAIL_DELIVERY_FAILED",
+                        "Failed to send email: SendGrid returned " + response.getStatusCode());
+            }
+        } catch (IOException e) {
+            throw new BusinessRuleException("EMAIL_DELIVERY_FAILED", "Failed to send email");
         }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(accountEmail);
-        message.setSubject("Verify your WhatsApp number");
-        message.setText("Your OTP to verify your WhatsApp number is: " + otp
-                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
-        mailSender.send(message);
     }
 
     @Transactional
