@@ -195,7 +195,7 @@ public class AuthService {
         String mobile = MobileNumberUtil.normalize(mobileNumber);
 
         userRepository.findByMobileNumber(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         twilioVerifyService.startVerification(mobile);
     }
@@ -239,7 +239,7 @@ public class AuthService {
         twilioVerifyService.checkVerification(mobile, request.getOtp());
 
         User user = userRepository.findByMobileNumber(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return createTokenResponse(user, request.getDeviceId(), request.getDeviceType());
     }
