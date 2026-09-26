@@ -44,6 +44,7 @@ public class AuthService {
     private final NotificationService notificationService;
     private final MechanicAvailabilityRepository availabilityRepository;
     private final CaptchaService captchaService;
+    private final TwilioVerifyService twilioVerifyService;
 
     public AuthService(
             UserRepository userRepository,
@@ -55,7 +56,8 @@ public class AuthService {
             OtpService otpService,
             NotificationService notificationService,
             MechanicAvailabilityRepository availabilityRepository,
-            CaptchaService captchaService) {
+            CaptchaService captchaService,
+            TwilioVerifyService twilioVerifyService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -66,6 +68,7 @@ public class AuthService {
         this.notificationService = notificationService;
         this.availabilityRepository = availabilityRepository;
         this.captchaService = captchaService;
+        this.twilioVerifyService = twilioVerifyService;
     }
 
     /**
@@ -191,12 +194,10 @@ public class AuthService {
 
         String mobile = MobileNumberUtil.normalize(mobileNumber);
 
-        User user = userRepository.findByMobileNumber(mobile)
+        userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String otp = otpService.generateAndSaveOtp(mobile);
-
-        notificationService.sendOtpEmail(mobile, user.getEmail(), otp);
+        twilioVerifyService.startVerification(mobile);
     }
 
     /**
@@ -235,7 +236,7 @@ public class AuthService {
 
         String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
 
-        otpService.validateOtp(mobile, request.getOtp());
+        twilioVerifyService.checkVerification(mobile, request.getOtp());
 
         User user = userRepository.findByMobileNumber(mobile)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -595,10 +596,8 @@ public class AuthService {
     }
 
     /**
-     * Sends an OTP to the user's <em>current</em> email address so they can
-     * authorise a mobile number change.
-     *
-     * <p>(SMS delivery is not yet implemented; the OTP is delivered via email.)
+     * Sends an SMS OTP (via Twilio Verify) to the <em>new</em> mobile number so
+     * the user can prove ownership before it's committed to the account.
      *
      * @param currentEmail the authenticated user's current email (from JWT principal)
      * @param newMobile    the mobile number the user wants to change to (raw, will be normalised)
@@ -609,11 +608,10 @@ public class AuthService {
         if (userRepository.existsByMobileNumber(normalizedMobile)) {
             throw new BadRequestException("This mobile number is already registered to another account");
         }
-        User user = userRepository.findByEmail(currentEmail)
+        userRepository.findByEmail(currentEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        String otp = otpService.generateAndSaveOtpForMobile(normalizedMobile, user.getEmail());
-        notificationService.sendMobileChangeOtp(user.getEmail(), otp);
+        twilioVerifyService.startVerification(normalizedMobile);
     }
 
     /**
@@ -634,7 +632,7 @@ public class AuthService {
         User user = userRepository.findByEmail(currentEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        otpService.validateOtpByMobile(normalizedMobile, otp);
+        twilioVerifyService.checkVerification(normalizedMobile, otp);
 
         user.setMobileNumber(normalizedMobile);
         userRepository.save(user);

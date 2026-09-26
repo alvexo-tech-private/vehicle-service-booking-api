@@ -113,16 +113,6 @@ public class NotificationService {
     }
 
     /**
-     * Sends an OTP to the user's <em>current</em> email address so they can
-     * authorise a mobile number change. (SMS delivery is not yet implemented.)
-     */
-    public void sendMobileChangeOtp(String currentEmail, String otp) {
-        sendOtpViaSendGrid(currentEmail, "Verify your new mobile number",
-                "Your OTP to verify your new mobile number is: " + otp
-                        + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
-    }
-
-    /**
      * Sends an OTP to verify a workshop owner's WhatsApp number.
      * (SMS/WhatsApp delivery is not yet implemented — delivered via the owner's account email.)
      */

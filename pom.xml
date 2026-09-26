@@ -178,6 +178,12 @@
 			<groupId>com.sendgrid</groupId>
 			<artifactId>sendgrid-java</artifactId>
 		</dependency>
+		<!-- Twilio Verify: SMS OTP delivery for login and mobile-number-change flows -->
+		<dependency>
+			<groupId>com.twilio.sdk</groupId>
+			<artifactId>twilio</artifactId>
+			<version>13.0.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>
