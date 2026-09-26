@@ -27,7 +27,6 @@ import com.sendgrid.SendGrid;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
-import com.sendgrid.helpers.mail.objects.Personalization;
 
 @Service
 public class NotificationService {
@@ -89,36 +88,13 @@ public class NotificationService {
         mailSender.send(message);
     }
     
-    public void sendOtpEmail(String mobileNumber, String otp)   {
-
-        Email from = new Email(fromEmail);
-        Email toEmail = new Email(toEmailAddress);
-        
-        Personalization personalization = new Personalization();
-		personalization.addTo(new Email("srisivas362@gmail.com"));
-		personalization.addTo(new Email("daniv.james@gmail.com"));
-		personalization.addTo(new Email("sureshksmech@gmail.com"));
-
-        Content emailContent = new Content("text/plain", "OTP for mobile number " + mobileNumber + " is: " + otp);
-        Mail mail = new Mail(from, "Your OTP Code for "+mobileNumber, toEmail, emailContent);
-        
-		mail.addPersonalization(personalization);
-
-        SendGrid sg = new SendGrid(sendGridApiKey);
-        Request request = new Request();
-
-        request.setMethod(Method.POST);
-        request.setEndpoint("mail/send");
-        Response response=null;
-        try {
-			request.setBody(mail.build());
-			response = sg.api(request);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-
-        System.out.println("Status Code: " + response.getStatusCode());
+    public void sendOtpEmail(String mobileNumber, String email, String otp) {
+        if (email == null || email.isBlank()) {
+            throw new BusinessRuleException("EMAIL_DELIVERY_FAILED",
+                    "No email on file for this account; SMS delivery is not yet available");
+        }
+        sendOtpViaSendGrid(email, "Your OTP Code for " + mobileNumber,
+                "OTP for mobile number " + mobileNumber + " is: " + otp);
     }
     
     // ── Contact-detail change OTP delivery ────────────────────────────────────

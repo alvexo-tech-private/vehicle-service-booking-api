@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 053-make-otp-verifications-email-nullable
+      author: system
+      comment: >
+        The mobile-only OTP flow (login/registration send-otp/request-otp) never
+        sets email, so every insert violated this NOT NULL constraint, surfacing
+        as a 409 "The request conflicts with existing data". Only the
+        email-change and mobile-change OTP flows populate this column.
+      changes:
+        - dropNotNullConstraint:
+            tableName: otp_verifications
+            columnName: email
+            columnDataType: VARCHAR(50)
+      rollback:
+        - addNotNullConstraint:
+            tableName: otp_verifications
+            columnName: email
+            columnDataType: VARCHAR(50)

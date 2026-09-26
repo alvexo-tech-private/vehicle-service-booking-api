@@ -104,3 +104,5 @@ databaseChangeLog:
   # ── Workshop Settings v2 — Level 1 (Basic) / Level 2 (Advanced) only ─────────
   - include:
           file: db/changelog/changes/052-migrate-legacy-level3-4-to-level2.yaml
+  - include:
+          file: db/changelog/changes/053-make-otp-verifications-email-nullable.yaml

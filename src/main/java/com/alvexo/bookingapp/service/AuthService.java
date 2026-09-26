@@ -196,7 +196,7 @@ public class AuthService {
 
         String otp = otpService.generateAndSaveOtp(mobile);
 
-        notificationService.sendOtpEmail(mobile, otp);
+        notificationService.sendOtpEmail(mobile, user.getEmail(), otp);
     }
 
     /**
