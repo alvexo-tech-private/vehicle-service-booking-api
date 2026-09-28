@@ -221,12 +221,27 @@ public class AuthService {
 
     /**
      * Captcha-gated OTP request (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §2 —
-     * OTP misuse prevention). Validates the captcha first, then delegates to the
-     * same delivery path as {@link #sendOtp}.
+     * OTP misuse prevention). Validates the captcha first, then sends the OTP.
+     *
+     * <p>Purpose changes which existence check applies: {@code REGISTRATION}
+     * verifies a phone number that must <em>not</em> be registered yet (the
+     * user doesn't exist as an account until registration completes), while
+     * every other purpose (login, forgot-PIN, ...) requires an existing user,
+     * same as {@link #sendOtp}.
      */
     public void requestOtp(RequestOtpRequest request) {
         captchaService.validateAndConsume(request.getCaptchaId(), request.getCaptchaResponse());
-        sendOtp(request.getPhone());
+
+        String mobile = MobileNumberUtil.normalize(request.getPhone());
+
+        if ("REGISTRATION".equalsIgnoreCase(request.getPurpose())) {
+            if (userRepository.existsByMobileNumber(mobile)) {
+                throw new BadRequestException("This mobile number is already registered. Please log in instead.");
+            }
+            twilioVerifyService.startVerification(mobile);
+        } else {
+            sendOtp(mobile);
+        }
     }
 
 
