@@ -1,0 +1,68 @@
+databaseChangeLog:
+  - changeSet:
+      id: 054-seed-test-vehicle-user
+      author: system
+      context: dev
+      runOnChange: false
+      comment: >
+        Static, pre-verified VEHICLE_USER test account for manual/QA testing.
+        Logs in via /api/auth/login (email or mobile + PIN) with no OTP/SMS
+        step needed. Credentials: test.rider@alvexotech.com / 9000000001 / PIN 1234.
+
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 0
+            sql: SELECT COUNT(*) FROM users WHERE email = 'test.rider@alvexotech.com'
+
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: first_name
+                  value: Test
+
+              - column:
+                  name: last_name
+                  value: Rider
+
+              - column:
+                  name: password
+                  value: $2a$10$KbK9ZdAoPKohKj2pRo65XupdhDymVLUE5oQzQ4Nc2ZEp7QAqHFURC
+
+              - column:
+                  name: role
+                  value: VEHICLE_USER
+
+              - column:
+                  name: email
+                  value: test.rider@alvexotech.com
+
+              - column:
+                  name: mobile_number
+                  value: 9000000001
+
+              - column:
+                  name: city
+                  value: Chennai
+
+              - column:
+                  name: active
+                  valueBoolean: true
+
+              - column:
+                  name: email_verified
+                  valueBoolean: true
+
+              - column:
+                  name: mobile_verified
+                  valueBoolean: true
+
+              - column:
+                  name: created_at
+                  valueDate: NOW()
+
+              - column:
+                  name: updated_at
+                  valueDate: NOW()

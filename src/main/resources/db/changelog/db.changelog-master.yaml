@@ -135,3 +135,10 @@ databaseChangeLog:
           file: db/changelog/changes/052-migrate-legacy-level3-4-to-level2.yaml
   - include:
           file: db/changelog/changes/053-make-otp-verifications-email-nullable.yaml
+  # ── Static, pre-verified test accounts (one per role, no OTP needed) ────────
+  - include:
+          file: db/changelog/changes/054-seed-test-vehicle-user.yaml
+  - include:
+          file: db/changelog/changes/055-seed-test-mechanic.yaml
+  - include:
+          file: db/changelog/changes/056-seed-test-sales-representative.yaml
