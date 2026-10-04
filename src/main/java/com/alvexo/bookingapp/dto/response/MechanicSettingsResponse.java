@@ -44,6 +44,9 @@ public class MechanicSettingsResponse {
     private List<ServiceAllocationEntry> serviceAllocations;
     private Boolean allowGeneralUseExpressHours;
 
+    private Integer rescheduleLimit;
+    private LocalTime rescheduleCutoffTime;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

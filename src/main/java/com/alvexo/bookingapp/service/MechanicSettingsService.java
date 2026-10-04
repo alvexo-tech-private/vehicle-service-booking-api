@@ -202,6 +202,8 @@ public class MechanicSettingsService {
                 .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
                 .autoIssue(s.getAutoIssue())
                 .allowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours())
+                .rescheduleLimit(s.getRescheduleLimit())
+                .rescheduleCutoffTime(s.getRescheduleCutoffTime())
                 .build();
     }
 
@@ -221,6 +223,8 @@ public class MechanicSettingsService {
         auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationCapacityHours", before.getAutoAllocationCapacityHours(), after.getAutoAllocationCapacityHours());
         auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoIssue", before.getAutoIssue(), after.getAutoIssue());
         auditLogService.logIfChanged(mechanic, mechanic, entityType, "allowGeneralUseExpressHours", before.getAllowGeneralUseExpressHours(), after.getAllowGeneralUseExpressHours());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "rescheduleLimit", before.getRescheduleLimit(), after.getRescheduleLimit());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "rescheduleCutoffTime", before.getRescheduleCutoffTime(), after.getRescheduleCutoffTime());
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -283,6 +287,8 @@ public class MechanicSettingsService {
         s.setAutoIssue(r.getAutoIssue());
         if (r.getServiceAllocations() != null) s.setServiceAllocations(r.getServiceAllocations());
         if (r.getAllowGeneralUseExpressHours() != null) s.setAllowGeneralUseExpressHours(r.getAllowGeneralUseExpressHours());
+        if (r.getRescheduleLimit() != null) s.setRescheduleLimit(r.getRescheduleLimit());
+        if (r.getRescheduleCutoffTime() != null) s.setRescheduleCutoffTime(r.getRescheduleCutoffTime());
     }
 
     /**
@@ -417,6 +423,8 @@ public class MechanicSettingsService {
                 .serviceSettings(services)
                 .serviceAllocations(s.getServiceAllocations())
                 .allowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours())
+                .rescheduleLimit(s.getRescheduleLimit())
+                .rescheduleCutoffTime(s.getRescheduleCutoffTime())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
                 .build();

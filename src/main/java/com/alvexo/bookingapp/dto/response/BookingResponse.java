@@ -64,4 +64,6 @@ public class BookingResponse {
 
     private LocalDateTime proposedDateTime;
     private BookingProposalStatus proposalStatus;
+
+    private Integer rescheduleCount;
 }

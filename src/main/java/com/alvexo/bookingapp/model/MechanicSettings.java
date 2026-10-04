@@ -160,6 +160,19 @@ public class MechanicSettings {
     @Builder.Default
     private Boolean allowGeneralUseExpressHours = false;
 
+    /** Maximum number of times a rider/mechanic may reschedule a single booking. */
+    @Column(name = "reschedule_limit", nullable = false)
+    @Builder.Default
+    private Integer rescheduleLimit = 2;
+
+    /**
+     * Same-day-prior cutoff: once it's this time on the day before a booking's
+     * scheduled date, that booking can no longer be rescheduled.
+     */
+    @Column(name = "reschedule_cutoff_time", nullable = false)
+    @Builder.Default
+    private LocalTime rescheduleCutoffTime = LocalTime.of(17, 0);
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

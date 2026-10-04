@@ -142,3 +142,6 @@ databaseChangeLog:
           file: db/changelog/changes/055-seed-test-mechanic.yaml
   - include:
           file: db/changelog/changes/056-seed-test-sales-representative.yaml
+  # ── Reschedule governance (cutoff + limit + per-booking count) ───────────────
+  - include:
+          file: db/changelog/changes/057-add-reschedule-governance-fields.yaml

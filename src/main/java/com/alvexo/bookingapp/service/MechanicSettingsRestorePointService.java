@@ -120,6 +120,8 @@ public class MechanicSettingsRestorePointService {
         r.setAutoIssue(s.getAutoIssue());
         r.setServiceAllocations(s.getServiceAllocations());
         r.setAllowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours());
+        r.setRescheduleLimit(s.getRescheduleLimit());
+        r.setRescheduleCutoffTime(s.getRescheduleCutoffTime());
         return r;
     }
 

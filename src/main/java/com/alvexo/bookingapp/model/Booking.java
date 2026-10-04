@@ -211,6 +211,11 @@ public class Booking {
     @Column(name = "idempotency_key", unique = true, length = 100)
     private String idempotencyKey;
 
+    /** Incremented on every successful rider/mechanic reschedule; governs the mechanic's rescheduleLimit. */
+    @Column(name = "reschedule_count", nullable = false)
+    @Builder.Default
+    private Integer rescheduleCount = 0;
+
     // ── Today Approval two-stage flow (§5) ────────────────────────────────────
 
     /** Set when the workshop accepts a REQUESTED booking; the rider must confirm before this passes. */

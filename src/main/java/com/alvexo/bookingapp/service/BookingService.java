@@ -638,12 +638,29 @@ public class BookingService {
             throw new BadRequestException("Cannot reschedule to a past date/time");
         }
 
+        MechanicSettings settings = mechanicSettingsRepository.findByMechanic(booking.getMechanic()).orElse(null);
+        int rescheduleLimit = settings != null ? settings.getRescheduleLimit() : 2;
+        LocalTime rescheduleCutoffTime = settings != null ? settings.getRescheduleCutoffTime() : LocalTime.of(17, 0);
+
+        if (booking.getRescheduleCount() >= rescheduleLimit) {
+            throw new BadRequestException(
+                    "This booking has already been rescheduled " + rescheduleLimit + " time(s), the maximum allowed.");
+        }
+
+        LocalDate currentScheduledDate = booking.getScheduledDateTime().toLocalDate();
+        if (currentScheduledDate.equals(LocalDate.now().plusDays(1)) && LocalTime.now().isAfter(rescheduleCutoffTime)) {
+            throw new BadRequestException(
+                    "The reschedule cutoff (" + rescheduleCutoffTime
+                            + ") for tomorrow's booking has passed. Please contact the workshop directly.");
+        }
+
         List<Booking> conflicts = bookingRepository.findAndLockConflicting(booking.getMechanic(), newScheduledDateTime);
         if (!conflicts.isEmpty()) {
             throw new BadRequestException("The requested time is already booked. Please choose a different time.");
         }
 
         booking.setScheduledDateTime(newScheduledDateTime);
+        booking.setRescheduleCount(booking.getRescheduleCount() + 1);
 
         try {
             booking = bookingRepository.save(booking);
@@ -1084,6 +1101,7 @@ public class BookingService {
                 .createdAt(booking.getCreatedAt())
                 .proposedDateTime(booking.getProposedDateTime())
                 .proposalStatus(booking.getProposalStatus())
+                .rescheduleCount(booking.getRescheduleCount())
                 .build();
     }
 

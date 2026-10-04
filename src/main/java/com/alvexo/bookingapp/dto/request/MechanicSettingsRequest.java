@@ -90,4 +90,10 @@ public class MechanicSettingsRequest {
 
     /** "Allow General bookings to use Express hours when spare capacity exists". */
     private Boolean allowGeneralUseExpressHours;
+
+    /** Max times a single booking may be rescheduled. Omit to leave unchanged. */
+    private Integer rescheduleLimit;
+
+    /** Day-prior cutoff time after which a booking can no longer be rescheduled. Omit to leave unchanged. */
+    private LocalTime rescheduleCutoffTime;
 }
