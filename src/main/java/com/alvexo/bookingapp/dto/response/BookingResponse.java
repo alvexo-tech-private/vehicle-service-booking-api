@@ -51,6 +51,9 @@ public class BookingResponse {
     private String mechanicNotes;
     private String customerNotes;
     private String cancellationReason;
+    private String cancelledByName;
+
+    private Boolean canBookAgain;
 
     private Boolean pickupRequired;
     private String pickupAddress;

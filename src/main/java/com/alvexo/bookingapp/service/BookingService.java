@@ -768,10 +768,21 @@ public class BookingService {
         }
 
         if (accept) {
+            Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(booking.getMechanic());
             List<Booking> conflicts =
                     bookingRepository.findAndLockConflicting(booking.getMechanic(), booking.getProposedDateTime());
-            if (!conflicts.isEmpty()) {
+            boolean sharedTime = isSharedReportingOrSlotTime(
+                    booking.getMechanic(), booking.getServiceType(), booking.getProposedDateTime(), settingsOpt);
+            if (!conflicts.isEmpty() && !sharedTime) {
                 throw new BadRequestException("The proposed time is no longer available. Please contact the workshop.");
+            }
+            if (booking.getServiceType() == ServiceType.GENERAL_REPAIR) {
+                MechanicServiceSlot slot = findMatchingRepairSlot(booking.getMechanic(), booking.getProposedDateTime());
+                if (slot != null && conflicts.size() >= slot.getRepairQty()) {
+                    throw new BadRequestException(
+                            "The selected repair slot is fully booked for this date. "
+                                    + "Please choose an alternate slot or date.");
+                }
             }
             booking.setScheduledDateTime(booking.getProposedDateTime());
             booking.setProposalStatus(com.alvexo.bookingapp.model.BookingProposalStatus.ACCEPTED);
@@ -1202,6 +1213,10 @@ public class BookingService {
                 .mechanicNotes(booking.getMechanicNotes())
                 .customerNotes(booking.getCustomerNotes())
                 .cancellationReason(booking.getCancellationReason())
+                .cancelledByName(booking.getCancelledBy() != null
+                        ? booking.getCancelledBy().getFirstName() + " " + booking.getCancelledBy().getLastName()
+                        : null)
+                .canBookAgain(booking.getStatus() == BookingStatus.COMPLETED)
                 .pickupRequired(booking.getPickupRequired())
                 .pickupAddress(booking.getPickupAddress())
                 .dropRequired(booking.getDropRequired())
