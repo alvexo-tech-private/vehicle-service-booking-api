@@ -38,7 +38,7 @@ public class ServiceDeskDropService {
 
     @Transactional(readOnly = true)
     public DropSummaryResponse getDrops(User mechanic, LocalDate date) {
-        LocalDate resolvedDate = rejectFutureDate(date);
+        LocalDate resolvedDate = date != null ? date : LocalDate.now();
         List<Booking> bookings = bookingRepository.findDrops(mechanic, resolvedDate);
 
         List<DropVehicleResponse> vehicles = bookings.stream()
@@ -124,11 +124,4 @@ public class ServiceDeskDropService {
                 .build();
     }
 
-    private LocalDate rejectFutureDate(LocalDate date) {
-        LocalDate resolved = date != null ? date : LocalDate.now();
-        if (resolved.isAfter(LocalDate.now())) {
-            throw new BadRequestException("Future dates are not available on this tab");
-        }
-        return resolved;
-    }
 }

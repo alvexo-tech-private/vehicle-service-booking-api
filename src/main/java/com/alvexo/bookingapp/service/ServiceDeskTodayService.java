@@ -59,8 +59,6 @@ public class ServiceDeskTodayService {
 
     @Transactional(readOnly = true)
     public ServiceTodayResponse getToday(User mechanic, LocalDate date) {
-        rejectFutureDate(date);
-
         List<Booking> bookings = bookingRepository.findTodayWorkspaceBookings(mechanic, date);
 
         List<ServiceVehicleResponse> carryOver = new ArrayList<>();
@@ -289,12 +287,6 @@ public class ServiceDeskTodayService {
             throw new ResourceNotFoundException("Booking not found: " + bookingId);
         }
         return booking;
-    }
-
-    private void rejectFutureDate(LocalDate date) {
-        if (date.isAfter(LocalDate.now())) {
-            throw new BadRequestException("Future dates are not available on this tab");
-        }
     }
 
     ServiceVehicleResponse toVehicleResponse(Booking booking) {

@@ -3,6 +3,8 @@ package com.alvexo.bookingapp.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,10 +63,11 @@ public class BookingController {
                 .body(MyApiResponse.success("Booking created successfully", response));
     }
     
-    @Operation(summary = "Get my bookings", description = "Returns paginated list of bookings for the currently authenticated user.")
+    @Operation(summary = "Get my bookings", description = "Returns paginated list of bookings for the currently authenticated user, "
+            + "newest-scheduled-first by default. Includes every status (upcoming, active, completed, cancelled).")
     @GetMapping("/my-bookings")
     public ResponseEntity<MyApiResponse<Page<BookingResponse>>> getMyBookings(
-            Pageable pageable,
+            @PageableDefault(size = 20, sort = "scheduledDateTime", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -226,6 +229,24 @@ public class BookingController {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return ResponseEntity.ok(MyApiResponse.success(paymentService.createBookingPaymentIntent(rider, id)));
+    }
+
+    @Operation(summary = "Pay a booking's advance",
+               description = "Records an advance payment the rider already completed client-side (UPI/card/etc.) "
+                            + "against this booking, and moves the booking forward (PENDING_PAYMENT -> SCHEDULED, "
+                            + "or PENDING -> CONFIRMED).")
+    @PostMapping("/{id}/pay-advance")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> payAdvance(
+            @PathVariable Long id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.PayAdvanceRequest request,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.payAdvance(
+                id, rider, request.getAmount(), request.getPaymentTransactionId());
+        return ResponseEntity.ok(MyApiResponse.success("Advance payment processed successfully", response));
     }
 
     @Operation(summary = "Issue job card manually",

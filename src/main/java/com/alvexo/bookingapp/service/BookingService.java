@@ -33,6 +33,9 @@ import com.alvexo.bookingapp.model.MechanicServiceSetting;
 import com.alvexo.bookingapp.model.MechanicServiceSlot;
 import com.alvexo.bookingapp.model.MechanicSettings;
 import com.alvexo.bookingapp.model.NotificationType;
+import com.alvexo.bookingapp.model.Payment;
+import com.alvexo.bookingapp.model.PaymentStatus;
+import com.alvexo.bookingapp.model.PaymentType;
 import com.alvexo.bookingapp.model.ServiceType;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
@@ -42,6 +45,7 @@ import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSlotRepository;
 import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
+import com.alvexo.bookingapp.repository.PaymentRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.repository.UserVehicleRepository;
 import com.alvexo.bookingapp.repository.VehicleRepository;
@@ -69,6 +73,7 @@ public class BookingService {
     private final MechanicDailyOverrideService dailyOverrideService;
     private final UserVehicleRepository userVehicleRepository;
     private final ReminderCycleService reminderCycleService;
+    private final PaymentRepository paymentRepository;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -82,7 +87,8 @@ public class BookingService {
             MechanicHolidayService holidayService,
             MechanicDailyOverrideService dailyOverrideService,
             UserVehicleRepository userVehicleRepository,
-            ReminderCycleService reminderCycleService) {
+            ReminderCycleService reminderCycleService,
+            PaymentRepository paymentRepository) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
@@ -95,6 +101,7 @@ public class BookingService {
         this.holidayService = holidayService;
         this.dailyOverrideService = dailyOverrideService;
         this.userVehicleRepository = userVehicleRepository;
+        this.paymentRepository = paymentRepository;
     }
 
     /**
@@ -925,6 +932,59 @@ public class BookingService {
 
         return new com.alvexo.bookingapp.dto.response.ConfirmRequestResponse(
                 booking.getId(), booking.getStatus(), false, BigDecimal.ZERO);
+    }
+
+    /**
+     * Records an advance payment the rider already completed (e.g. via UPI/Stripe client-side)
+     * against a specific booking (MASTER_BACKEND_MVP_INTEGRATION_SPEC.md §4.1). Unlike
+     * {@link #confirmRequest}, which gates the Today Approval two-stage flow on an amount already
+     * recorded via {@link com.alvexo.bookingapp.service.PaymentService#createBookingPaymentIntent},
+     * this is the single call a client makes to both log the payment and move the booking forward
+     * in one step.
+     */
+    @Transactional
+    public BookingResponse payAdvance(Long bookingId, User rider, BigDecimal amount, String paymentTransactionId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + bookingId));
+
+        if (!booking.getVehicleUser().getId().equals(rider.getId())) {
+            throw new BadRequestException("You don't have access to this booking");
+        }
+        if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.REJECTED
+                || booking.getStatus() == BookingStatus.COMPLETED || booking.getStatus() == BookingStatus.EXPIRED) {
+            throw new BadRequestException("A " + booking.getStatus() + " booking cannot accept a payment");
+        }
+
+        paymentRepository.save(Payment.builder()
+                .user(rider)
+                .booking(booking)
+                .paymentType(PaymentType.BOOKING_PAYMENT)
+                .amount(amount)
+                .currency("INR")
+                .status(PaymentStatus.COMPLETED)
+                .transactionId(paymentTransactionId)
+                .paymentDate(LocalDateTime.now())
+                .build());
+
+        booking.setAdvancePaid(amount);
+        booking.setRequiredAdvanceAmount(null);
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+            booking.setStatus(BookingStatus.SCHEDULED);
+            booking.setConfirmationExpiresAt(null);
+        } else if (booking.getStatus() == BookingStatus.PENDING) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+        }
+        booking = bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getMechanic(),
+                "Advance Payment Received",
+                "Advance of INR " + amount + " was paid for booking #" + booking.getBookingNumber(),
+                NotificationType.GENERAL,
+                "Booking",
+                booking.getId());
+
+        return convertToResponse(booking);
     }
 
     /** Lazily transitions a lapsed PENDING_PAYMENT booking to EXPIRED on access (no background sweep exists). */

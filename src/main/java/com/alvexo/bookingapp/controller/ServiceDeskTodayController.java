@@ -40,7 +40,7 @@ public class ServiceDeskTodayController {
         this.userRepository = userRepository;
     }
 
-    @Operation(summary = "Get today's service workspace", description = "Carry-over + today + cancelled partitions, plus matrix counters. Future dates are rejected.")
+    @Operation(summary = "Get today's service workspace", description = "Carry-over + today + cancelled partitions, plus matrix counters. Accepts any date, including future dates.")
     @GetMapping("/today")
     public ResponseEntity<MyApiResponse<ServiceTodayResponse>> getToday(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

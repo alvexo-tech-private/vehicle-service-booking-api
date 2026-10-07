@@ -2,7 +2,6 @@ package com.alvexo.bookingapp.service;
 
 import com.alvexo.bookingapp.dto.response.EarningEntryResponse;
 import com.alvexo.bookingapp.dto.response.EarningsResponse;
-import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.model.Booking;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.BookingRepository;
@@ -34,9 +33,6 @@ public class ServiceDeskEarningsService {
     @Transactional(readOnly = true)
     public EarningsResponse getEarnings(User mechanic, LocalDate date) {
         LocalDate resolvedDate = date != null ? date : LocalDate.now();
-        if (resolvedDate.isAfter(LocalDate.now())) {
-            throw new BadRequestException("Future dates are not available on this tab");
-        }
 
         List<Booking> bookings = bookingRepository.findDailyAdvanceSummaryBookings(mechanic, resolvedDate);
 
