@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,14 +30,17 @@ import com.alvexo.bookingapp.model.JobCardType;
 import com.alvexo.bookingapp.model.MechanicAvailability;
 import com.alvexo.bookingapp.model.MechanicDailyOverride;
 import com.alvexo.bookingapp.model.MechanicServiceSetting;
+import com.alvexo.bookingapp.model.MechanicServiceSlot;
 import com.alvexo.bookingapp.model.MechanicSettings;
 import com.alvexo.bookingapp.model.NotificationType;
+import com.alvexo.bookingapp.model.ServiceType;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.model.Vehicle;
 import com.alvexo.bookingapp.repository.BookingRepository;
 import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
+import com.alvexo.bookingapp.repository.MechanicServiceSlotRepository;
 import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.repository.UserVehicleRepository;
@@ -59,6 +63,7 @@ public class BookingService {
     private final MechanicAvailabilityRepository availabilityRepository;
     private final MechanicSettingsRepository mechanicSettingsRepository;
     private final MechanicServiceSettingRepository serviceSettingRepository;
+    private final MechanicServiceSlotRepository serviceSlotRepository;
     private final NotificationService notificationService;
     private final MechanicHolidayService holidayService;
     private final MechanicDailyOverrideService dailyOverrideService;
@@ -72,6 +77,7 @@ public class BookingService {
             MechanicAvailabilityRepository availabilityRepository,
             MechanicSettingsRepository mechanicSettingsRepository,
             MechanicServiceSettingRepository serviceSettingRepository,
+            MechanicServiceSlotRepository serviceSlotRepository,
             NotificationService notificationService,
             MechanicHolidayService holidayService,
             MechanicDailyOverrideService dailyOverrideService,
@@ -83,6 +89,7 @@ public class BookingService {
         this.availabilityRepository = availabilityRepository;
         this.mechanicSettingsRepository = mechanicSettingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
+        this.serviceSlotRepository = serviceSlotRepository;
         this.notificationService = notificationService;
         this.reminderCycleService = reminderCycleService;
         this.holidayService = holidayService;
@@ -175,7 +182,7 @@ public class BookingService {
         //    round NOW up to the next 30-minute boundary so same-day Instant bookings always work.
         if (!Boolean.TRUE.equals(request.getTodayApprovalRequest())) {
             LocalDateTime resolvedDateTime = resolveInstantBookingTime(
-                    request.getScheduledDateTime(), settingsOpt);
+                    request.getScheduledDateTime(), request.getServiceType(), settingsOpt);
             // Replace the scheduled time in request with the resolved value.
             // (BookingRequest is mutable; this avoids passing extra args everywhere below.)
             request.setScheduledDateTime(resolvedDateTime);
@@ -205,7 +212,13 @@ public class BookingService {
             throw new BadRequestException("deliveryAddress is required when dropRequired is true");
         }
 
-        // 6c. Today Approval two-stage flow (§5): rider explicitly requests approval instead
+        // 6c. Repair time must be one of the workshop's 3 published options — applies to both
+        // Instant and Today Approval modes (REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md §2.3/§4.3).
+        if (request.getServiceType() == ServiceType.GENERAL_REPAIR) {
+            validateRepairSlotTime(mechanic, request.getScheduledDateTime(), settingsOpt);
+        }
+
+        // 6d. Today Approval two-stage flow (§5): rider explicitly requests approval instead
         // of an instant booking. Deliberately skips the capacity check below — that's the
         // whole point of asking the workshop to decide by hand. No capacity is reserved (and
         // no advance is owed) until the workshop accepts and the rider then confirms.
@@ -251,12 +264,28 @@ public class BookingService {
                 mechanic, serviceSetting, bookingDate, request.getScheduledDateTime(),
                 request.getAdvancePaid(), settingsOpt);
 
-        // 8. PESSIMISTIC LOCK — concurrency layer 1
+        // 8. PESSIMISTIC LOCK — concurrency layer 1. A non-empty result only rejects the booking
+        // when the requested time is NOT one of the workshop's published shared times (General/
+        // Express reporting time, or a Repair slot) — those are meant to host many bookings at
+        // the identical timestamp, bounded by maxVehiclesPerDay/fullDayCapacityHours/repairQty
+        // instead of exact-timestamp exclusivity (REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md).
         List<Booking> conflicts = bookingRepository.findAndLockConflicting(
                 mechanic, request.getScheduledDateTime());
-        if (!conflicts.isEmpty()) {
+        boolean sharedTime = isSharedReportingOrSlotTime(
+                mechanic, request.getServiceType(), request.getScheduledDateTime(), settingsOpt);
+        if (!conflicts.isEmpty() && !sharedTime) {
             throw new BadRequestException(
                     "This slot is already booked. Please choose a different time.");
+        }
+
+        // 8b. A Repair slot's own repairQty caps how many bookings may share that exact slot.
+        if (request.getServiceType() == ServiceType.GENERAL_REPAIR) {
+            MechanicServiceSlot slot = findMatchingRepairSlot(mechanic, request.getScheduledDateTime());
+            if (slot != null && conflicts.size() >= slot.getRepairQty()) {
+                throw new BadRequestException(
+                        "The selected repair slot is fully booked for this date. "
+                                + "Please choose an alternate slot or date.");
+            }
         }
 
         // 9. Route by the mechanic's Job Card Type (RIDER_BOOKING_TO_WORKSHOP.md §4.1):
@@ -991,23 +1020,105 @@ public class BookingService {
         }
     }
 
+    private static final DateTimeFormatter TIME_12H =
+            DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.ENGLISH);
+
     /**
-     * Resolves the scheduled date-time for an Instant booking from workshop settings.
+     * A Repair booking's time must be one of the workshop's 3 published options: the general
+     * morning reporting time, or one of its two enabled repair slots
+     * (REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md §4.3).
+     */
+    private void validateRepairSlotTime(User mechanic, LocalDateTime scheduledDateTime,
+            Optional<MechanicSettings> settingsOpt) {
+        LocalTime requestedTime = scheduledDateTime.toLocalTime();
+        List<MechanicServiceSlot> slots = serviceSlotRepository.findByMechanicOrderBySlotNumberAsc(mechanic)
+                .stream().filter(s -> Boolean.TRUE.equals(s.getEnabled())).toList();
+
+        LocalTime reportingTime = settingsOpt.map(MechanicSettings::getServiceReportingTime).orElse(null);
+        boolean matchesReportingTime = reportingTime != null && requestedTime.equals(reportingTime);
+        boolean matchesSlot = slots.stream().anyMatch(s -> requestedTime.equals(s.getSlotTime()));
+
+        if (!matchesReportingTime && !matchesSlot) {
+            List<String> allowed = new java.util.ArrayList<>();
+            if (reportingTime != null) allowed.add(reportingTime.format(TIME_12H));
+            slots.forEach(s -> allowed.add(s.getSlotTime().format(TIME_12H)));
+            throw new BadRequestException(
+                    "The requested time is outside the workshop's working hours or repair slots. "
+                            + "Allowed times: " + String.join(", ", allowed) + ".");
+        }
+    }
+
+    /**
+     * Whether {@code scheduledDateTime} is one of the workshop's published shared times for
+     * {@code serviceType} — the general/express reporting time, or (for Repair) a configured
+     * slot time. Bookings at a shared time don't collide with each other; they're bounded by
+     * count-based capacity (maxVehiclesPerDay / fullDayCapacityHours / slot repairQty) instead
+     * of the exact-timestamp conflict check (REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md).
+     */
+    private boolean isSharedReportingOrSlotTime(User mechanic, ServiceType serviceType,
+            LocalDateTime scheduledDateTime, Optional<MechanicSettings> settingsOpt) {
+        if (settingsOpt.isEmpty()) {
+            return false;
+        }
+        MechanicSettings settings = settingsOpt.get();
+        LocalTime requestedTime = scheduledDateTime.toLocalTime();
+
+        if (serviceType == ServiceType.EXPRESS_SERVICE) {
+            LocalTime expressTime = settings.getExpressReportingTime() != null
+                    ? settings.getExpressReportingTime() : settings.getServiceReportingTime();
+            return requestedTime.equals(expressTime);
+        }
+        if (serviceType == ServiceType.GENERAL_REPAIR) {
+            if (requestedTime.equals(settings.getServiceReportingTime())) {
+                return true;
+            }
+            return serviceSlotRepository.findByMechanicOrderBySlotNumberAsc(mechanic).stream()
+                    .anyMatch(s -> Boolean.TRUE.equals(s.getEnabled()) && requestedTime.equals(s.getSlotTime()));
+        }
+        return requestedTime.equals(settings.getServiceReportingTime());
+    }
+
+    /**
+     * For a Repair booking at a configured Slot 1/2 time, the slot's own repairQty caps how
+     * many bookings may share that exact slot — independent of the day-level capacity check.
+     * Returns null when the requested time isn't a configured slot (e.g. the general reporting
+     * time, which is governed by the day-level check only).
+     */
+    private MechanicServiceSlot findMatchingRepairSlot(User mechanic, LocalDateTime scheduledDateTime) {
+        LocalTime requestedTime = scheduledDateTime.toLocalTime();
+        return serviceSlotRepository.findByMechanicOrderBySlotNumberAsc(mechanic).stream()
+                .filter(s -> Boolean.TRUE.equals(s.getEnabled()) && requestedTime.equals(s.getSlotTime()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * Resolves the scheduled date-time for an Instant booking from workshop settings
+     * (REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md §2).
      *
-     * Algorithm:
-     *  1. If settings exist and have a serviceReportingTime, use the date portion of the
-     *     requested scheduledDateTime combined with the workshop's serviceReportingTime.
-     *  2. If the resulting time is in the past (same-day booking after reporting time),
-     *     round the current wall-clock time up to the next 30-minute boundary instead.
-     *  3. If settings are absent, return the original value unchanged.
+     * Algorithm, branched by service category:
+     *  - GENERAL_SERVICE (and anything else not covered below): snap to serviceReportingTime.
+     *  - EXPRESS_SERVICE: snap to expressReportingTime, falling back to serviceReportingTime
+     *    when express isn't configured.
+     *  - GENERAL_REPAIR: never snapped — the rider already picked one of the 3 allowed times
+     *    (morning / Slot 1 / Slot 2) client-side; {@link #validateRepairSlotTime} checks it.
+     *
+     * For the snapped categories: if the resulting time is in the past (same-day booking
+     * after reporting time), round the current wall-clock time up to the next 30-minute
+     * boundary instead. If settings are absent, return the original value unchanged.
      */
     private LocalDateTime resolveInstantBookingTime(
-            LocalDateTime requested, Optional<MechanicSettings> settingsOpt) {
+            LocalDateTime requested, ServiceType serviceType, Optional<MechanicSettings> settingsOpt) {
+        if (serviceType == ServiceType.GENERAL_REPAIR) {
+            return requested;
+        }
         if (settingsOpt.isEmpty()) {
             return requested;
         }
         MechanicSettings settings = settingsOpt.get();
-        LocalTime reportingTime = settings.getServiceReportingTime();
+        LocalTime reportingTime = serviceType == ServiceType.EXPRESS_SERVICE
+                ? (settings.getExpressReportingTime() != null
+                        ? settings.getExpressReportingTime() : settings.getServiceReportingTime())
+                : settings.getServiceReportingTime();
         if (reportingTime == null) {
             return requested;
         }

@@ -145,3 +145,6 @@ databaseChangeLog:
   # ── Reschedule governance (cutoff + limit + per-booking count) ───────────────
   - include:
           file: db/changelog/changes/057-add-reschedule-governance-fields.yaml
+  # ── Repair slots & booking time spec ──────────────────────────────────────────
+  - include:
+          file: db/changelog/changes/058-drop-exact-slot-unique-index.yaml

@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 058-drop-exact-slot-unique-index
+      author: system
+      comment: >
+        REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md — this partial unique index
+        (added in 015a) blocked ANY two active bookings for a mechanic at the
+        same exact scheduled_date_time. That's wrong for General/Express
+        Service, where many vehicles are meant to share one fixed daily
+        reporting time (capacity governed by maxVehiclesPerDay /
+        fullDayCapacityHours, not timestamp uniqueness), and it made Repair
+        slots - which explicitly allow repairQty bookings per slot time -
+        impossible after the first booking. Capacity is now enforced purely
+        by the existing count-based checks in BookingService, guarded by the
+        application-level PESSIMISTIC_WRITE lock (findAndLockConflicting).
+      changes:
+        - sql:
+            sql: DROP INDEX IF EXISTS uq_mechanic_slot_active;
+      rollback:
+        - sql:
+            sql: >
+              CREATE UNIQUE INDEX uq_mechanic_slot_active
+              ON bookings (mechanic_id, scheduled_date_time)
+              WHERE status NOT IN ('CANCELLED', 'REJECTED');
