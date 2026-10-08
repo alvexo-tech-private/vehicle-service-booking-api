@@ -166,6 +166,13 @@ public class ServiceDeskTodayService {
                     "Duplicate Job Card / " + jobCardNumber + " is already in use.");
         }
 
+        notificationService.createNotification(
+                booking.getVehicleUser(),
+                "Vehicle Checked In",
+                "Your vehicle (" + vehicleLabel(booking) + ") has arrived at the workshop. Job Card #"
+                        + jobCardNumber + " issued.",
+                NotificationType.GENERAL, "Booking", booking.getId());
+
         return toVehicleResponse(booking);
     }
 
@@ -245,15 +252,29 @@ public class ServiceDeskTodayService {
             case PENDING -> {
                 booking.setStatus(BookingStatus.IN_PROGRESS);
                 booking.setServiceStage(ServiceDeskStage.PENDING);
+                notificationService.createNotification(
+                        booking.getVehicleUser(),
+                        "Service In Progress",
+                        "Service for your vehicle (" + vehicleLabel(booking) + ") is now in progress.",
+                        NotificationType.GENERAL, "Booking", booking.getId());
             }
             case COMPLETED -> {
                 booking.setStatus(BookingStatus.COMPLETED);
                 booking.setServiceStage(null);
                 booking.setCompletedAt(LocalDateTime.now());
                 reminderCycleService.ensureCycleForCompletedBooking(booking);
+                notificationService.createNotification(
+                        booking.getVehicleUser(),
+                        "Service Completed",
+                        "Great news! Your vehicle (" + vehicleLabel(booking) + ") service is completed and ready for pickup!",
+                        NotificationType.GENERAL, "Booking", booking.getId());
             }
             default -> throw new IllegalArgumentException("Unsupported target status: " + target);
         }
+    }
+
+    private String vehicleLabel(Booking booking) {
+        return booking.getVehicle().getMake() + " " + booking.getVehicle().getModel();
     }
 
     /**

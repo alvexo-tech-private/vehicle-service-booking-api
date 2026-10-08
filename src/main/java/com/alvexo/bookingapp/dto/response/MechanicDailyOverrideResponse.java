@@ -5,6 +5,9 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+
+import com.alvexo.bookingapp.dto.ServiceCapacityOverrideEntry;
 
 @Data
 @Builder
@@ -18,6 +21,7 @@ public class MechanicDailyOverrideResponse {
     private BigDecimal fullDayCapacityHoursOverride;
     private Boolean advanceEnabledOverride;
     private BigDecimal advanceAmountOverride;
+    private List<ServiceCapacityOverrideEntry> serviceCapacities;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -11,6 +11,7 @@ import com.alvexo.bookingapp.model.*;
 import com.alvexo.bookingapp.repository.BookingRepository;
 import com.alvexo.bookingapp.repository.MechanicConfigurationSettingsRepository;
 import com.alvexo.bookingapp.repository.MechanicDailyOverrideRepository;
+import com.alvexo.bookingapp.repository.MechanicDailyServiceCapacityRepository;
 import com.alvexo.bookingapp.repository.MechanicPromotionalOfferRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSlotRepository;
@@ -44,6 +45,7 @@ public class MechanicDashboardService {
     private final UserVehicleRepository userVehicleRepository;
     private final MechanicConfigurationSettingsRepository configurationSettingsRepository;
     private final MechanicDailyOverrideRepository dailyOverrideRepository;
+    private final MechanicDailyServiceCapacityRepository dailyServiceCapacityRepository;
     private final MechanicPromotionalOfferRepository promotionalOfferRepository;
     private final ReminderCycleRepository reminderCycleRepository;
     private final ReminderCycleService reminderCycleService;
@@ -55,6 +57,7 @@ public class MechanicDashboardService {
                                      UserVehicleRepository userVehicleRepository,
                                      MechanicConfigurationSettingsRepository configurationSettingsRepository,
                                      MechanicDailyOverrideRepository dailyOverrideRepository,
+                                     MechanicDailyServiceCapacityRepository dailyServiceCapacityRepository,
                                      MechanicPromotionalOfferRepository promotionalOfferRepository,
                                      ReminderCycleRepository reminderCycleRepository,
                                      ReminderCycleService reminderCycleService) {
@@ -67,6 +70,7 @@ public class MechanicDashboardService {
         this.reminderCycleRepository = reminderCycleRepository;
         this.reminderCycleService = reminderCycleService;
         this.dailyOverrideRepository = dailyOverrideRepository;
+        this.dailyServiceCapacityRepository = dailyServiceCapacityRepository;
         this.promotionalOfferRepository = promotionalOfferRepository;
     }
 
@@ -103,7 +107,7 @@ public class MechanicDashboardService {
         BigDecimal utilization = computeCapacityUtilization(mechanic, settings, date, dayBookings);
 
         List<ServiceBreakdownResponse> serviceBreakdown =
-                buildServiceBreakdown(mechanic, dayBookings);
+                buildServiceBreakdown(mechanic, date, dayBookings);
 
         List<ServiceSlotSummaryResponse> slots = buildSlotSummary(mechanic, dayBookings);
 
@@ -315,7 +319,13 @@ public class MechanicDashboardService {
         return b.getEstimatedDurationMinutes() != null ? b.getEstimatedDurationMinutes() : 0;
     }
 
-    private List<ServiceBreakdownResponse> buildServiceBreakdown(User mechanic, List<Booking> todaysBookings) {
+    private List<ServiceBreakdownResponse> buildServiceBreakdown(User mechanic, LocalDate date, List<Booking> todaysBookings) {
+        Map<String, Integer> capacityOverrides = dailyOverrideRepository.findByMechanicAndDate(mechanic, date)
+                .map(dailyServiceCapacityRepository::findByDailyOverride)
+                .map(capacities -> capacities.stream().collect(Collectors.toMap(
+                        MechanicDailyServiceCapacity::getServiceName, MechanicDailyServiceCapacity::getCapacity)))
+                .orElseGet(Map::of);
+
         return serviceSettingRepository.findByMechanicAndIsActiveTrueOrderByDisplayOrderAsc(mechanic).stream()
                 .map(service -> {
                     List<Booking> forService = todaysBookings.stream()
@@ -326,11 +336,14 @@ public class MechanicDashboardService {
                     long issued = forService.stream().filter(b -> b.getJobCardNumber() != null).count();
                     long pending = forService.stream().filter(b -> b.getStatus() == BookingStatus.PENDING).count();
 
+                    Integer maxSlotsPerDay = capacityOverrides.getOrDefault(
+                            service.getServiceName(), service.getMaxSlotsPerDay());
+
                     return ServiceBreakdownResponse.builder()
                             .serviceId(service.getId())
                             .serviceName(service.getServiceName())
                             .category(service.getCategory())
-                            .maxSlotsPerDay(service.getMaxSlotsPerDay())
+                            .maxSlotsPerDay(maxSlotsPerDay)
                             .bookedCount((long) forService.size())
                             .issuedCount(issued)
                             .pendingCount(pending)

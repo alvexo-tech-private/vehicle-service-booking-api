@@ -1,5 +1,6 @@
 package com.alvexo.bookingapp.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -7,6 +8,9 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+
+import com.alvexo.bookingapp.dto.ServiceCapacityOverrideEntry;
 
 @Data
 public class MechanicDailyOverrideRequest {
@@ -25,4 +29,8 @@ public class MechanicDailyOverrideRequest {
 
     @DecimalMin(value = "0.01", message = "advanceAmountOverride must be greater than 0")
     private BigDecimal advanceAmountOverride;
+
+    /** Per-service maxSlotsPerDay override for this date only. Null/omitted = leave unchanged. */
+    @Valid
+    private List<ServiceCapacityOverrideEntry> serviceCapacities;
 }

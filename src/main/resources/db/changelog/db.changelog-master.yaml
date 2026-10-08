@@ -148,3 +148,6 @@ databaseChangeLog:
   # ── Repair slots & booking time spec ──────────────────────────────────────────
   - include:
           file: db/changelog/changes/058-drop-exact-slot-unique-index.yaml
+  # ── Per-service daily capacity override ───────────────────────────────────────
+  - include:
+          file: db/changelog/changes/059-create-mechanic-daily-service-capacities-table.yaml
