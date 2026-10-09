@@ -151,3 +151,6 @@ databaseChangeLog:
   # ── Per-service daily capacity override ───────────────────────────────────────
   - include:
           file: db/changelog/changes/059-create-mechanic-daily-service-capacities-table.yaml
+  # ── Canonical Booking ID series: {workshopCode} {stateCode} {sequence} ──────
+  - include:
+          file: db/changelog/changes/060-create-workshop-booking-sequences-table.yaml

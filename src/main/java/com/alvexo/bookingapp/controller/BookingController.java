@@ -40,7 +40,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
-    
+
     @Autowired
     private BookingService bookingService;
 
@@ -49,7 +49,7 @@ public class BookingController {
 
     @Autowired
     private com.alvexo.bookingapp.service.PaymentService paymentService;
-    
+
     @Operation(summary = "Create a booking", description = "Vehicle user creates a new service booking with a mechanic.")
     @PostMapping
     public ResponseEntity<MyApiResponse<BookingResponse>> createBooking(
@@ -57,12 +57,12 @@ public class BookingController {
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         BookingResponse response = bookingService.createBooking(request, user);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(MyApiResponse.success("Booking created successfully", response));
     }
-    
+
     @Operation(summary = "Get my bookings", description = "Returns paginated list of bookings for the currently authenticated user, "
             + "newest-scheduled-first by default. Includes every status (upcoming, active, completed, cancelled).")
     @GetMapping("/my-bookings")
@@ -71,34 +71,36 @@ public class BookingController {
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         Page<BookingResponse> bookings = bookingService.getUserBookings(user, pageable);
         return ResponseEntity.ok(MyApiResponse.success(bookings));
     }
-    
-    @Operation(summary = "Get booking by ID", description = "Returns full details of a specific booking. User must be the customer or the mechanic.")
+
+    @Operation(summary = "Get booking by ID",
+               description = "Returns full details of a specific booking. User must be the customer or the mechanic. "
+                            + "{id} accepts either the numeric database id or the canonical bookingNumber (e.g. \"1888 TN 0881\").")
     @GetMapping("/{id}")
     public ResponseEntity<MyApiResponse<BookingResponse>> getBookingById(
-            @PathVariable Long id,
+            @PathVariable String id,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        BookingResponse booking = bookingService.getBookingById(id, user);
+
+        BookingResponse booking = bookingService.getBookingById(bookingService.resolveBookingId(id), user);
         return ResponseEntity.ok(MyApiResponse.success(booking));
     }
-    
+
     @Operation(summary = "Update booking status", description = "Mechanic or admin updates the status of a booking (e.g. CONFIRMED, COMPLETED, CANCELLED).")
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('MECHANIC', 'ADMINISTRATOR')")   
+    @PreAuthorize("hasAnyRole('MECHANIC', 'ADMINISTRATOR')")
     public ResponseEntity<MyApiResponse<BookingResponse>> updateBookingStatus(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestParam BookingStatus status,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        BookingResponse response = bookingService.updateBookingStatus(id, status, user);
+
+        BookingResponse response = bookingService.updateBookingStatus(bookingService.resolveBookingId(id), status, user);
         return ResponseEntity.ok(MyApiResponse.success("Booking status updated", response));
     }
 
@@ -107,13 +109,14 @@ public class BookingController {
     @PutMapping("/{id}/cancel")
     @PreAuthorize("hasRole('VEHICLE_USER')")
     public ResponseEntity<MyApiResponse<BookingResponse>> cancelBooking(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody BookingCancelRequest request,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        BookingResponse response = bookingService.cancelBookingAsRider(id, user, request.getReason());
+        BookingResponse response = bookingService.cancelBookingAsRider(
+                bookingService.resolveBookingId(id), user, request.getReason());
         return ResponseEntity.ok(MyApiResponse.success("Booking cancelled", response));
     }
 
@@ -139,7 +142,7 @@ public class BookingController {
     @PutMapping("/{id}/reschedule")
     @PreAuthorize("hasAnyRole('MECHANIC', 'VEHICLE_USER')")
     public ResponseEntity<MyApiResponse<BookingResponse>> rescheduleBooking(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestParam("scheduledDateTime")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime newScheduledDateTime,
@@ -147,7 +150,8 @@ public class BookingController {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        BookingResponse response = bookingService.rescheduleBooking(id, newScheduledDateTime, user);
+        BookingResponse response = bookingService.rescheduleBooking(
+                bookingService.resolveBookingId(id), newScheduledDateTime, user);
         return ResponseEntity.ok(MyApiResponse.success("Booking rescheduled successfully", response));
     }
 
@@ -157,13 +161,14 @@ public class BookingController {
     @PostMapping("/{id}/propose-date")
     @PreAuthorize("hasRole('MECHANIC')")
     public ResponseEntity<MyApiResponse<BookingResponse>> proposeDate(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody com.alvexo.bookingapp.dto.request.ProposeDateRequest request,
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        BookingResponse response = bookingService.proposeDate(id, mechanic, request.getProposedDateTime());
+        BookingResponse response = bookingService.proposeDate(
+                bookingService.resolveBookingId(id), mechanic, request.getProposedDateTime());
         return ResponseEntity.ok(MyApiResponse.success("Alternate date proposed", response));
     }
 
@@ -173,13 +178,14 @@ public class BookingController {
     @PostMapping("/{id}/proposal-response")
     @PreAuthorize("hasRole('VEHICLE_USER')")
     public ResponseEntity<MyApiResponse<BookingResponse>> respondToProposal(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody com.alvexo.bookingapp.dto.request.ProposalResponseRequest request,
             Authentication authentication) {
         User rider = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        BookingResponse response = bookingService.respondToProposal(id, rider, Boolean.TRUE.equals(request.getAccept()));
+        BookingResponse response = bookingService.respondToProposal(
+                bookingService.resolveBookingId(id), rider, Boolean.TRUE.equals(request.getAccept()));
         String message = Boolean.TRUE.equals(request.getAccept()) ? "Proposal accepted" : "Proposal declined; booking cancelled";
         return ResponseEntity.ok(MyApiResponse.success(message, response));
     }
@@ -190,13 +196,14 @@ public class BookingController {
     @PostMapping("/{id}/workshop-decision")
     @PreAuthorize("hasRole('MECHANIC')")
     public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.WorkshopDecisionResponse>> workshopDecision(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody com.alvexo.bookingapp.dto.request.WorkshopDecisionRequest request,
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        var response = bookingService.workshopDecision(id, mechanic, Boolean.TRUE.equals(request.getAccept()));
+        var response = bookingService.workshopDecision(
+                bookingService.resolveBookingId(id), mechanic, Boolean.TRUE.equals(request.getAccept()));
         String message = Boolean.TRUE.equals(request.getAccept()) ? "Request accepted" : "Request rejected";
         return ResponseEntity.ok(MyApiResponse.success(message, response));
     }
@@ -207,12 +214,12 @@ public class BookingController {
     @PostMapping("/{id}/confirm-request")
     @PreAuthorize("hasRole('VEHICLE_USER')")
     public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.ConfirmRequestResponse>> confirmRequest(
-            @PathVariable Long id,
+            @PathVariable String id,
             Authentication authentication) {
         User rider = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        var response = bookingService.confirmRequest(id, rider);
+        var response = bookingService.confirmRequest(bookingService.resolveBookingId(id), rider);
         String message = response.paymentRequired() ? "Advance payment required" : "Booking confirmed";
         return ResponseEntity.ok(MyApiResponse.success(message, response));
     }
@@ -223,12 +230,13 @@ public class BookingController {
     @PostMapping("/{id}/payment-intent")
     @PreAuthorize("hasRole('VEHICLE_USER')")
     public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.PaymentIntentResponse>> createPaymentIntent(
-            @PathVariable Long id,
+            @PathVariable String id,
             Authentication authentication) {
         User rider = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return ResponseEntity.ok(MyApiResponse.success(paymentService.createBookingPaymentIntent(rider, id)));
+        Long bookingId = bookingService.resolveBookingId(id);
+        return ResponseEntity.ok(MyApiResponse.success(paymentService.createBookingPaymentIntent(rider, bookingId)));
     }
 
     @Operation(summary = "Pay a booking's advance",
@@ -238,14 +246,14 @@ public class BookingController {
     @PostMapping("/{id}/pay-advance")
     @PreAuthorize("hasRole('VEHICLE_USER')")
     public ResponseEntity<MyApiResponse<BookingResponse>> payAdvance(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody com.alvexo.bookingapp.dto.request.PayAdvanceRequest request,
             Authentication authentication) {
         User rider = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         BookingResponse response = bookingService.payAdvance(
-                id, rider, request.getAmount(), request.getPaymentTransactionId());
+                bookingService.resolveBookingId(id), rider, request.getAmount(), request.getPaymentTransactionId());
         return ResponseEntity.ok(MyApiResponse.success("Advance payment processed successfully", response));
     }
 
@@ -254,12 +262,12 @@ public class BookingController {
     @PutMapping("/{id}/issue-job-card")
     @PreAuthorize("hasRole('MECHANIC')")
     public ResponseEntity<MyApiResponse<BookingResponse>> issueJobCard(
-            @PathVariable Long id,
+            @PathVariable String id,
             Authentication authentication) {
         User mechanic = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        BookingResponse response = bookingService.issueJobCard(id, mechanic);
+        BookingResponse response = bookingService.issueJobCard(bookingService.resolveBookingId(id), mechanic);
         return ResponseEntity.ok(MyApiResponse.success("Job card issued", response));
     }
 }

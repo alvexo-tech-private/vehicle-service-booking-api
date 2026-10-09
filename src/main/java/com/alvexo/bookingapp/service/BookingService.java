@@ -7,7 +7,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -40,6 +39,7 @@ import com.alvexo.bookingapp.model.ServiceType;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.model.Vehicle;
+import com.alvexo.bookingapp.model.WorkshopBookingSequence;
 import com.alvexo.bookingapp.repository.BookingRepository;
 import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
@@ -74,6 +74,7 @@ public class BookingService {
     private final UserVehicleRepository userVehicleRepository;
     private final ReminderCycleService reminderCycleService;
     private final PaymentRepository paymentRepository;
+    private final com.alvexo.bookingapp.repository.WorkshopBookingSequenceRepository workshopBookingSequenceRepository;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -88,7 +89,8 @@ public class BookingService {
             MechanicDailyOverrideService dailyOverrideService,
             UserVehicleRepository userVehicleRepository,
             ReminderCycleService reminderCycleService,
-            PaymentRepository paymentRepository) {
+            PaymentRepository paymentRepository,
+            com.alvexo.bookingapp.repository.WorkshopBookingSequenceRepository workshopBookingSequenceRepository) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
@@ -102,6 +104,7 @@ public class BookingService {
         this.dailyOverrideService = dailyOverrideService;
         this.userVehicleRepository = userVehicleRepository;
         this.paymentRepository = paymentRepository;
+        this.workshopBookingSequenceRepository = workshopBookingSequenceRepository;
     }
 
     /**
@@ -235,7 +238,7 @@ public class BookingService {
                     .mechanic(mechanic)
                     .vehicle(vehicle)
                     .serviceSetting(serviceSetting)
-                    .bookingNumber(generateBookingNumber())
+                    .bookingNumber(generateBookingNumber(mechanic))
                     .scheduledDateTime(request.getScheduledDateTime())
                     .status(BookingStatus.REQUESTED)
                     .bookingType(BookingType.STANDARD)
@@ -311,7 +314,7 @@ public class BookingService {
                 .mechanic(mechanic)
                 .vehicle(vehicle)
                 .serviceSetting(serviceSetting)
-                .bookingNumber(generateBookingNumber())
+                .bookingNumber(generateBookingNumber(mechanic))
                 .scheduledDateTime(request.getScheduledDateTime())
                 .status(initialStatus)
                 .bookingType(bookingType)
@@ -425,7 +428,7 @@ public class BookingService {
                 .mechanic(mechanic)
                 .vehicle(vehicle)
                 .serviceSetting(serviceSetting)
-                .bookingNumber(generateBookingNumber())
+                .bookingNumber(generateBookingNumber(mechanic))
                 .scheduledDateTime(scheduledDateTime)
                 .status(BookingStatus.CONFIRMED)
                 .bookingType(bookingType)
@@ -1291,8 +1294,57 @@ public class BookingService {
                 .build();
     }
 
-    private String generateBookingNumber() {
-        return "BKG" + System.currentTimeMillis()
-                + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+    /**
+     * Canonical Booking ID series (MASTER_BACKEND_MVP_INTEGRATION_SPEC.md v3 §4.11): builds
+     * "{workshopCode} {stateCode} {sequence}" (e.g. "1888 TN 0881") from a per-workshop row in
+     * workshop_booking_sequences, creating it on first use. workshopCode is permanently assigned
+     * from workshop_code_seq (starts at 1888); stateCode is resolved once from the workshop's
+     * onboarded location and then fixed, even if the workshop later edits its address.
+     */
+    private String generateBookingNumber(User mechanic) {
+        WorkshopBookingSequence sequence = workshopBookingSequenceRepository
+                .findByMechanicForUpdate(mechanic)
+                .orElseGet(() -> createWorkshopBookingSequence(mechanic));
+
+        sequence.setCurrentSequence(sequence.getCurrentSequence() + 1);
+        sequence = workshopBookingSequenceRepository.save(sequence);
+
+        return sequence.getWorkshopCode() + " " + sequence.getStateCode() + " "
+                + String.format("%04d", sequence.getCurrentSequence());
+    }
+
+    private WorkshopBookingSequence createWorkshopBookingSequence(User mechanic) {
+        String stateCode = Constants.INDIAN_STATE_CODES.getOrDefault(
+                mechanic.getState(), Constants.DEFAULT_STATE_CODE);
+        WorkshopBookingSequence sequence = WorkshopBookingSequence.builder()
+                .mechanic(mechanic)
+                .workshopCode(String.valueOf(workshopBookingSequenceRepository.nextWorkshopCode()))
+                .stateCode(stateCode)
+                .currentSequence(0)
+                .build();
+        try {
+            return workshopBookingSequenceRepository.save(sequence);
+        } catch (DataIntegrityViolationException e) {
+            // Lost a race to create the first row for this workshop — the winner already has it.
+            return workshopBookingSequenceRepository.findByMechanicForUpdate(mechanic)
+                    .orElseThrow(() -> e);
+        }
+    }
+
+    /**
+     * Resolves a path {id} that may be either the numeric database id or the canonical
+     * bookingNumber string (MASTER_BACKEND_MVP_INTEGRATION_SPEC.md v3 §4.11 "Universal Booking ID
+     * Resolution") — lets every /api/bookings/{id}/* endpoint accept either form.
+     */
+    @Transactional(readOnly = true)
+    public Long resolveBookingId(String idOrBookingNumber) {
+        try {
+            return Long.parseLong(idOrBookingNumber);
+        } catch (NumberFormatException e) {
+            return bookingRepository.findByBookingNumber(idOrBookingNumber)
+                    .map(Booking::getId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Booking not found: " + idOrBookingNumber));
+        }
     }
 }
