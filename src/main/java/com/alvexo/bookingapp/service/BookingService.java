@@ -167,37 +167,32 @@ public class BookingService {
             throw new BadRequestException("This vehicle is not registered to your account");
         }
 
-        // 3. Reject past-dated bookings
-        if (request.getScheduledDateTime().isBefore(LocalDateTime.now())) {
+        // 3. Reject past bookings. Only GENERAL_REPAIR is a real time-slot booking (people queue
+        // for an exact Slot 1/Slot 2 window), so it alone enforces the full datetime-in-the-past
+        // check (e.g. at 1:10pm, a 1:00pm slot is no longer bookable). GENERAL_SERVICE/
+        // EXPRESS_SERVICE treat the chosen time as informational — only the booking DATE can't be
+        // in the past; a same-day time that's technically already elapsed is still accepted.
+        boolean isSlotBooking = request.getServiceType() == ServiceType.GENERAL_REPAIR;
+        if (isSlotBooking) {
+            if (request.getScheduledDateTime().isBefore(LocalDateTime.now())) {
+                throw new BadRequestException("Bookings cannot be made for past dates");
+            }
+        } else if (request.getScheduledDateTime().toLocalDate().isBefore(LocalDate.now())) {
             throw new BadRequestException("Bookings cannot be made for past dates");
         }
 
         // 3b. Reject bookings on a Holiday/Pause date
         rejectIfHolidayOrPause(mechanic, request.getScheduledDateTime().toLocalDate());
 
-        // 4. Validate slot within mechanic's availability template
-        validateSlotWithinAvailability(mechanic, request.getScheduledDateTime());
+        // 4. Validate slot within mechanic's availability template — only meaningful for an
+        // actual time-slot booking; a general booking's time isn't matched against working hours.
+        if (isSlotBooking) {
+            validateSlotWithinAvailability(mechanic, request.getScheduledDateTime());
+        }
 
         // 5. Load mechanic settings (optional — some mechanics may not have configured yet)
         Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(mechanic);
         LocalDate bookingDate = request.getScheduledDateTime().toLocalDate();
-
-        // 5b. For Instant bookings (todayApprovalRequest != true), auto-resolve the scheduled time
-        // from the workshop's API settings when the client sends a date-only or a time that is
-        // before the workshop's serviceReportingTime (e.g. midnight).
-        //
-        // Rules (WORKSHOP_SETTINGS_V2):
-        //  - Use workshop's serviceReportingTime as the target reporting time.
-        //  - If booking is today and serviceReportingTime has already passed,
-        //    round NOW up to the next 30-minute boundary so same-day Instant bookings always work.
-        if (!Boolean.TRUE.equals(request.getTodayApprovalRequest())) {
-            LocalDateTime resolvedDateTime = resolveInstantBookingTime(
-                    request.getScheduledDateTime(), request.getServiceType(), settingsOpt);
-            // Replace the scheduled time in request with the resolved value.
-            // (BookingRequest is mutable; this avoids passing extra args everywhere below.)
-            request.setScheduledDateTime(resolvedDateTime);
-            bookingDate = resolvedDateTime.toLocalDate();
-        }
 
         // 6. Resolve service setting (if provided)
         MechanicServiceSetting serviceSetting = null;
@@ -496,6 +491,13 @@ public class BookingService {
                 throw new BadRequestException(
                         "serviceSettingId is required for this mechanic (hour-slot mode)");
             }
+            if (serviceSetting.getDurationMinutes() == null) {
+                throw new BadRequestException(
+                        "Service '" + serviceSetting.getServiceName() + "' has no configured duration");
+            }
+            if (fullDayCapacityHours == null) {
+                throw new BadRequestException("Mechanic's daily capacity hours are not configured");
+            }
 
             int durationMinutes = serviceSetting.getDurationMinutes();
 
@@ -533,6 +535,9 @@ public class BookingService {
 
         } else {
             // ── Vehicle-count mode ────────────────────────────────────────
+            if (maxVehiclesPerDay == null) {
+                throw new BadRequestException("Mechanic's daily vehicle limit is not configured");
+            }
             long activeCount = bookingRepository.countActiveBookingsForMechanicOnDate(mechanic, bookingDate);
             if (activeCount >= maxVehiclesPerDay) {
                 throw new BadRequestException(
@@ -1163,64 +1168,6 @@ public class BookingService {
         return serviceSlotRepository.findByMechanicOrderBySlotNumberAsc(mechanic).stream()
                 .filter(s -> Boolean.TRUE.equals(s.getEnabled()) && requestedTime.equals(s.getSlotTime()))
                 .findFirst().orElse(null);
-    }
-
-    /**
-     * Resolves the scheduled date-time for an Instant booking from workshop settings
-     * (REPAIR_SLOTS_AND_BOOKING_TIME_SPEC.md §2).
-     *
-     * Algorithm, branched by service category:
-     *  - GENERAL_SERVICE (and anything else not covered below): snap to serviceReportingTime.
-     *  - EXPRESS_SERVICE: snap to expressReportingTime, falling back to serviceReportingTime
-     *    when express isn't configured.
-     *  - GENERAL_REPAIR: never snapped — the rider already picked one of the 3 allowed times
-     *    (morning / Slot 1 / Slot 2) client-side; {@link #validateRepairSlotTime} checks it.
-     *
-     * For the snapped categories: if the resulting time is in the past (same-day booking
-     * after reporting time), round the current wall-clock time up to the next 30-minute
-     * boundary instead. If settings are absent, return the original value unchanged.
-     */
-    private LocalDateTime resolveInstantBookingTime(
-            LocalDateTime requested, ServiceType serviceType, Optional<MechanicSettings> settingsOpt) {
-        if (serviceType == ServiceType.GENERAL_REPAIR) {
-            return requested;
-        }
-        if (settingsOpt.isEmpty()) {
-            return requested;
-        }
-        MechanicSettings settings = settingsOpt.get();
-        LocalTime reportingTime = serviceType == ServiceType.EXPRESS_SERVICE
-                ? (settings.getExpressReportingTime() != null
-                        ? settings.getExpressReportingTime() : settings.getServiceReportingTime())
-                : settings.getServiceReportingTime();
-        if (reportingTime == null) {
-            return requested;
-        }
-
-        LocalDate bookingDate = requested.toLocalDate();
-        LocalDateTime candidateDateTime = bookingDate.atTime(reportingTime);
-
-        LocalDateTime now = LocalDateTime.now();
-        if (candidateDateTime.isAfter(now)) {
-            // Reporting time is still in the future — use it directly.
-            return candidateDateTime;
-        }
-
-        if (bookingDate.isEqual(LocalDate.now())) {
-            // Same-day Instant booking and reporting time has passed — round up to next 30-min slot.
-            int minute = now.getMinute();
-            int roundedMinute = (minute / 30 + 1) * 30;
-            LocalDateTime nextHalfHour;
-            if (roundedMinute >= 60) {
-                nextHalfHour = now.withMinute(0).withSecond(0).withNano(0).plusHours(1);
-            } else {
-                nextHalfHour = now.withMinute(roundedMinute).withSecond(0).withNano(0);
-            }
-            return nextHalfHour;
-        }
-
-        // Future date but reporting time computed as past (clock skew?) — keep the workshop's time.
-        return candidateDateTime;
     }
 
     /**
