@@ -167,17 +167,16 @@ public class BookingService {
             throw new BadRequestException("This vehicle is not registered to your account");
         }
 
-        // 3. Reject past bookings. Only GENERAL_REPAIR is a real time-slot booking (people queue
-        // for an exact Slot 1/Slot 2 window), so it alone enforces the full datetime-in-the-past
-        // check (e.g. at 1:10pm, a 1:00pm slot is no longer bookable). GENERAL_SERVICE/
-        // EXPRESS_SERVICE treat the chosen time as informational — only the booking DATE can't be
-        // in the past; a same-day time that's technically already elapsed is still accepted.
-        boolean isSlotBooking = request.getServiceType() == ServiceType.GENERAL_REPAIR;
-        if (isSlotBooking) {
-            if (request.getScheduledDateTime().isBefore(LocalDateTime.now())) {
-                throw new BadRequestException("Bookings cannot be made for past dates");
-            }
-        } else if (request.getScheduledDateTime().toLocalDate().isBefore(LocalDate.now())) {
+        // 3. Reject past bookings. Only GENERAL_REPAIR is a real time-slot booking (Level 2 /
+        // Advanced — people queue for an exact Slot 1/Slot 2 window), so it alone enforces the
+        // configured reporting time as a hard rule: the complete slot date+time must be strictly
+        // later than now (equal-to-now is already too late — e.g. at 1:00pm or 1:10pm, a 1:00pm
+        // slot is no longer bookable; at 12:50pm it still is). Level 1 GENERAL_SERVICE/
+        // EXPRESS_SERVICE treat the configured reporting time as informational only — only the
+        // booking DATE can't be in the past; a same-day time that's technically already elapsed
+        // is still accepted.
+        boolean isSlotBooking = isSlotBooking(request.getServiceType());
+        if (isPastBooking(request.getServiceType(), request.getScheduledDateTime(), LocalDateTime.now())) {
             throw new BadRequestException("Bookings cannot be made for past dates");
         }
 
@@ -1056,6 +1055,37 @@ public class BookingService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * True for an actual time-slot booking (Level 2 / Advanced — Slot 1/Slot 2, validated
+     * against the workshop's published reporting times). Everything else (Level 1 GENERAL_SERVICE,
+     * EXPRESS_SERVICE) is a "general" booking whose chosen time is informational only.
+     * Package-private (no DB access) so it's directly unit-testable.
+     */
+    static boolean isSlotBooking(ServiceType serviceType) {
+        return serviceType == ServiceType.GENERAL_REPAIR;
+    }
+
+    /**
+     * Whether {@code scheduledDateTime} is too late to book, given the current server time.
+     *
+     * Slot bookings (Level 2 / Advanced): the complete slot date+time must be strictly later
+     * than {@code now} — equal-to-now is already too late (a 1:00pm slot stops being bookable
+     * at exactly 1:00pm, not just after it), so next-day slots are always fine and same-day
+     * slots are only fine while still in the future.
+     *
+     * General bookings (Level 1 GENERAL_SERVICE/EXPRESS_SERVICE): the configured reporting time
+     * is informational only — only the booking DATE can't be before today; a same-day time that
+     * has technically already elapsed is still accepted.
+     *
+     * Package-private (no DB access) so it's directly unit-testable.
+     */
+    static boolean isPastBooking(ServiceType serviceType, LocalDateTime scheduledDateTime, LocalDateTime now) {
+        if (isSlotBooking(serviceType)) {
+            return !scheduledDateTime.isAfter(now);
+        }
+        return scheduledDateTime.toLocalDate().isBefore(now.toLocalDate());
+    }
 
     private void rejectIfHolidayOrPause(User mechanic, LocalDate date) {
         holidayService.findHoliday(mechanic, date).ifPresent(holiday -> {
