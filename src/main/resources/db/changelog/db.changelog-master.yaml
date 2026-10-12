@@ -154,3 +154,8 @@ databaseChangeLog:
   # ── Canonical Booking ID series: {workshopCode} {stateCode} {sequence} ──────
   - include:
           file: db/changelog/changes/060-create-workshop-booking-sequences-table.yaml
+  # ── Official Make & Model Classification (Petrol + Electric, Bikes + Scooters) ─
+  - include:
+          file: db/changelog/changes/061-seed-vehicle-catalogue-make-model-classification.yaml
+  - include:
+          file: db/changelog/changes/062-fix-existing-scooter-vehicle-types.yaml

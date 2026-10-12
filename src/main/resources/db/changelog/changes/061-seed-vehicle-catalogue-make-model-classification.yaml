@@ -1,0 +1,1559 @@
+databaseChangeLog:
+  - changeSet:
+      id: 061-seed-vehicle-catalogue-make-model-classification
+      author: system
+      context: dev
+      runOnChange: false
+      comment: >
+        Adds the full make/model set from the official "Make & Model Classification"
+        sheet (Petrol + Electric, Bikes + Scooters per make) that 022-seed-vehicle-catalogue.yaml
+        didn't already cover (a handful of makes/models — e.g. Honda Dio, Hero Glamour —
+        were already seeded there and are skipped here to avoid duplicate catalogue rows),
+        and introduces vehicle_type = SCOOTER so scooters are no longer miscategorized as
+        MOTORCYCLE. Purely additive — doesn't touch or remove any existing catalogue row,
+        so no previously-registered rider vehicle is affected.
+      changes:
+
+        # ── PETROL — Hero (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "HF 100" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Splendor" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Passion" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Xtreme" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Xpulse" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Karizma" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Harley-Davidson X440" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Hero (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Destini" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Xoom" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero" }
+              - column: { name: model,        value: "Pleasure" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Honda (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "Livo" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "SP125" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "CB125 Hornet" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "SP160" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "Hornet" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "NX200" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "CB350" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "CB500" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "CB750" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "CB1000" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "Transalp" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "Rebel" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "Gold Wing" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "CBR" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Honda (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "Activa" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Honda" }
+              - column: { name: model,        value: "ADV" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — TVS (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Sport" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Star City" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Raider" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Ronin" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Apache" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — TVS (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Jupiter" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Ntorq" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Zest" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Bajaj (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "CT" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "Platina" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "Pulsar" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "Avenger" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "Dominar" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "Freedom" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Yamaha (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "FZ" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "FZ-X" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "MT-15" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "R15" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "FZ-Rave" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "XSR" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Yamaha (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "Aerox" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "Fascino" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yamaha" }
+              - column: { name: model,        value: "RayZR" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Suzuki (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "Gixxer" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "V-Strom" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "GSX" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "Hayabusa" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Suzuki (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "Access" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "Burgman" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Suzuki" }
+              - column: { name: model,        value: "Avenis" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Royal Enfield (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Bullet" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Classic" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Hunter" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Meteor" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Goan Classic" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Guerrilla" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Himalayan" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Scram" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Interceptor" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Continental GT" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Super Meteor" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Shotgun" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Royal Enfield" }
+              - column: { name: model,        value: "Bear" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — KTM (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "KTM" }
+              - column: { name: model,        value: "Duke" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "KTM" }
+              - column: { name: model,        value: "RC" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "KTM" }
+              - column: { name: model,        value: "Adventure" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "KTM" }
+              - column: { name: model,        value: "Enduro" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "KTM" }
+              - column: { name: model,        value: "Super Duke" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "KTM" }
+              - column: { name: model,        value: "Super Adventure" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Jawa (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Jawa" }
+              - column: { name: model,        value: "42" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Jawa" }
+              - column: { name: model,        value: "350" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Jawa" }
+              - column: { name: model,        value: "42 Bobber" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Jawa" }
+              - column: { name: model,        value: "42 FJ" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Jawa" }
+              - column: { name: model,        value: "Perak" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Yezdi (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yezdi" }
+              - column: { name: model,        value: "Roadster" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yezdi" }
+              - column: { name: model,        value: "Scrambler" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Yezdi" }
+              - column: { name: model,        value: "Adventure" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — BMW (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "G 310" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "F 450" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "F 900" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "R 12" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "R 1300" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "S 1000" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "M 1000" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "K 1600" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — BMW (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "BMW" }
+              - column: { name: model,        value: "C 400 GT" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── PETROL — Triumph (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Speed" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Scrambler" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Tracker" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Thruxton" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Trident" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Daytona" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Tiger" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Bonneville" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Street Triple" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Speed Triple" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Triumph" }
+              - column: { name: model,        value: "Rocket 3" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "PETROL" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Ola (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ola" }
+              - column: { name: model,        value: "Roadster" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Ola (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ola" }
+              - column: { name: model,        value: "S1" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Ather (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ather" }
+              - column: { name: model,        value: "450" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ather" }
+              - column: { name: model,        value: "Rizta" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — TVS (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "iQube" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "X" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "TVS" }
+              - column: { name: model,        value: "Orbiter" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Bajaj (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Bajaj" }
+              - column: { name: model,        value: "Chetak" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Hero Vida (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero Vida" }
+              - column: { name: model,        value: "Vida" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Hero Vida" }
+              - column: { name: model,        value: "VX2" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Ampere (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ampere" }
+              - column: { name: model,        value: "Magnus" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ampere" }
+              - column: { name: model,        value: "Primus" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ampere" }
+              - column: { name: model,        value: "Reo" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — River (Scooters) ──────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "River" }
+              - column: { name: model,        value: "Indie" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "SCOOTER" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Ultraviolette (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ultraviolette" }
+              - column: { name: model,        value: "F77" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ultraviolette" }
+              - column: { name: model,        value: "X47" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ultraviolette" }
+              - column: { name: model,        value: "Tesseract" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Ultraviolette" }
+              - column: { name: model,        value: "Shockwave" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+
+        # ── ELECTRIC — Revolt (Bikes) ────────────────────────────────────────
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Revolt" }
+              - column: { name: model,        value: "RV1" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Revolt" }
+              - column: { name: model,        value: "RVX" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: make,         value: "Revolt" }
+              - column: { name: model,        value: "RV Blaze" }
+              - column: { name: year,         valueNumeric: 2024 }
+              - column: { name: vehicle_type, value: "MOTORCYCLE" }
+              - column: { name: fuel_type,    value: "ELECTRIC" }
+              - column: { name: active,       valueBoolean: true }
+              - column: { name: created_by,   valueComputed: "(SELECT id FROM users WHERE role = 'ADMINISTRATOR' LIMIT 1)" }
+              - column: { name: created_at,   valueComputed: "NOW()" }
+              - column: { name: updated_at,   valueComputed: "NOW()" }

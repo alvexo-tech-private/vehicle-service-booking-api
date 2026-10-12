@@ -63,18 +63,19 @@ public final class ServiceDeskMapper {
     }
 
     /**
-     * Best-effort ServiceTypeAbbr (§0 shared enums, ≤8 chars). The underlying
-     * VehicleType enum has no Bike/Scooter distinction (only MOTORCYCLE covers
-     * two-wheelers), so MOTORCYCLE is labelled "Bike" and every other vehicle
-     * type falls back to a generic "Veh" family; only the General/Express
-     * split (from BookingType) and the Repairs bucket are fully accurate.
+     * ServiceTypeAbbr (§0 shared enums, ≤8 chars): MOTORCYCLE -> "Bike", SCOOTER -> "Scooter",
+     * anything else (cars etc., not expected for this app) falls back to a generic "Veh" family.
      */
     public static String serviceTypeAbbr(Booking booking) {
         if (REPAIR_SERVICE_TYPES.contains(booking.getServiceType())) {
             return "Repairs";
         }
-        String family = booking.getVehicle() != null && booking.getVehicle().getVehicleType() == VehicleType.MOTORCYCLE
-                ? "Bike" : "Veh";
+        VehicleType vehicleType = booking.getVehicle() != null ? booking.getVehicle().getVehicleType() : null;
+        String family = switch (vehicleType != null ? vehicleType : VehicleType.OTHER) {
+            case MOTORCYCLE -> "Bike";
+            case SCOOTER -> "Scooter";
+            default -> "Veh";
+        };
         String suffix = booking.getBookingType() == BookingType.EXPRESS ? "Exp" : "Gen";
         return family + " " + suffix;
     }
