@@ -3,6 +3,7 @@ package com.alvexo.bookingapp.exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -18,10 +19,12 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -114,9 +117,26 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
-    /** Malformed JSON body, wrong enum value, unparsable date/time, etc. */
+    /**
+     * Malformed JSON body, wrong enum value, unparsable date/time, etc. For an invalid enum
+     * value specifically (e.g. "serviceType": "GENERAL" instead of "GENERAL_SERVICE") this names
+     * the offending field and lists the accepted values instead of a bare "malformed" message.
+     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<MyApiResponse<Void>> handleMalformedRequest(HttpMessageNotReadableException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof InvalidFormatException ife && ife.getTargetType() != null
+                && ife.getTargetType().isEnum()) {
+            String fieldName = ife.getPath().isEmpty()
+                    ? "request body"
+                    : ife.getPath().get(ife.getPath().size() - 1).getFieldName();
+            String allowedValues = Arrays.stream(ife.getTargetType().getEnumConstants())
+                    .map(Object::toString)
+                    .collect(Collectors.joining(", "));
+            String message = String.format("Invalid value '%s' for field '%s'. Allowed values: %s",
+                    ife.getValue(), fieldName, allowedValues);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(MyApiResponse.error(message));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(MyApiResponse.error("Malformed request body"));
     }
@@ -141,6 +161,19 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(MyApiResponse.error("The request conflicts with existing data"));
+    }
+
+    /**
+     * Covers CannotAcquireLockException / lock-timeout / deadlock-detected failures from the
+     * PESSIMISTIC_WRITE lock in BookingService.createBooking (findAndLockConflicting) and
+     * similar row-locking queries elsewhere — concurrent requests racing for the same row. This
+     * was previously uncaught and fell through to the generic 500 handler below.
+     */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<MyApiResponse<Void>> handlePessimisticLockingFailure(PessimisticLockingFailureException ex) {
+        log.warn("Pessimistic locking failure: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(MyApiResponse.error("This request conflicted with another in-progress request. Please try again."));
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)

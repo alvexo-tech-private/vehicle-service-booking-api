@@ -41,10 +41,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+
+import com.alvexo.bookingapp.util.Constants;
+
+import org.springframework.validation.annotation.Validated;
 
 @Tag(name = "Mechanics", description = "Mechanic availability management, slot discovery, and nearby search.")
 @RestController
 @RequestMapping("/api/mechanics")
+@Validated
 public class MechanicController {
 
 	@Autowired
@@ -255,12 +262,16 @@ public class MechanicController {
     // ── Nearby search ─────────────────────────────────────────────────────────
 
     @Operation(summary = "Find nearby mechanics",
-        description = "Returns active mechanics within a given radius (km) of provided coordinates.")
+        description = "Returns active mechanics within a given radius (km, 0 < radiusKm <= "
+                + Constants.MAX_SEARCH_RADIUS_KM + ") of provided coordinates.")
     @GetMapping("/nearby")
     public ResponseEntity<MyApiResponse<List<UserResponse>>> findNearbyMechanics(
             @RequestParam BigDecimal latitude,
             @RequestParam BigDecimal longitude,
-            @RequestParam(defaultValue = "10.0") double radiusKm) {
+            @RequestParam(defaultValue = "" + Constants.DEFAULT_SEARCH_RADIUS_KM)
+            @DecimalMin(value = "0.0", inclusive = false)
+            @DecimalMax(value = "" + Constants.MAX_SEARCH_RADIUS_KM)
+            double radiusKm) {
         return ResponseEntity.ok(MyApiResponse.success(
                 mechanicService.findNearbyMechanics(latitude, longitude, radiusKm)));
     }

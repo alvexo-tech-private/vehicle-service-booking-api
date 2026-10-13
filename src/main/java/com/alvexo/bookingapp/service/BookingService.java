@@ -198,7 +198,8 @@ public class BookingService {
         if (request.getServiceSettingId() != null) {
             serviceSetting = serviceSettingRepository.findById(request.getServiceSettingId())
                     .orElseThrow(() -> new ResourceNotFoundException("Service setting not found"));
-            if (!serviceSetting.getMechanic().getId().equals(mechanic.getId())) {
+            if (serviceSetting.getMechanic() == null
+                    || !serviceSetting.getMechanic().getId().equals(mechanic.getId())) {
                 throw new BadRequestException("Service does not belong to the selected mechanic");
             }
             if (!Boolean.TRUE.equals(serviceSetting.getIsActive())) {
@@ -1291,8 +1292,11 @@ public class BookingService {
     }
 
     private WorkshopBookingSequence createWorkshopBookingSequence(User mechanic) {
-        String stateCode = Constants.INDIAN_STATE_CODES.getOrDefault(
-                mechanic.getState(), Constants.DEFAULT_STATE_CODE);
+        // Map.ofEntries(...) is an immutable map and throws NPE on a null key (unlike HashMap),
+        // so the null-state fallback has to happen before the lookup, not inside getOrDefault.
+        String stateCode = mechanic.getState() != null
+                ? Constants.INDIAN_STATE_CODES.getOrDefault(mechanic.getState(), Constants.DEFAULT_STATE_CODE)
+                : Constants.DEFAULT_STATE_CODE;
         WorkshopBookingSequence sequence = WorkshopBookingSequence.builder()
                 .mechanic(mechanic)
                 .workshopCode(String.valueOf(workshopBookingSequenceRepository.nextWorkshopCode()))
