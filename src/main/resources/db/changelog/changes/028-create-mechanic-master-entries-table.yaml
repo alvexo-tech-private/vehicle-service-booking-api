@@ -1,0 +1,83 @@
+databaseChangeLog:
+  - changeSet:
+      id: 028-create-mechanic-master-entries-table
+      author: system
+      comment: >
+        Creates mechanic_master_entries — the "Mechanic Master" directory
+        (Configuration Settings §5): helper mechanics working under a
+        workshop, not full User accounts.
+      changes:
+        - createTable:
+            tableName: mechanic_master_entries
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: phone
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_master_entries
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_master_entries_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_mechanic_master_entries_mechanic
+            tableName: mechanic_master_entries
+            columns:
+              - column:
+                  name: mechanic_id
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_master_entries

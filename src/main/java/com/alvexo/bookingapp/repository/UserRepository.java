@@ -25,11 +25,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findByRole(UserRole role, Pageable pageable);
     Optional<User> findByEmailOrMobileNumber(String mobileNumber, String email);
 
+    // The acos() argument is clamped to [-1, 1] with least/greatest: floating-point rounding can
+    // push it fractionally above 1.0 when the search point coincides with (or is extremely close
+    // to) a mechanic's own coordinates, and acos() of an out-of-range input errors out in
+    // PostgreSQL rather than returning NaN — which would otherwise fail this entire search for
+    // the "closest possible match" case instead of just finding it.
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.active = true " +
            "AND (:latitude IS NULL OR :longitude IS NULL OR " +
-           "(6371 * acos(cos(radians(:latitude)) * cos(radians(u.latitude)) * " +
+           "(6371 * acos(least(1.0, greatest(-1.0, " +
+           "cos(radians(:latitude)) * cos(radians(u.latitude)) * " +
            "cos(radians(u.longitude) - radians(:longitude)) + " +
-           "sin(radians(:latitude)) * sin(radians(u.latitude)))) <= :radiusKm)")
+           "sin(radians(:latitude)) * sin(radians(u.latitude)))))) <= :radiusKm)")
     List<User> findNearbyMechanics(@Param("role") UserRole role,
                                     @Param("latitude") BigDecimal latitude,
                                     @Param("longitude") BigDecimal longitude,

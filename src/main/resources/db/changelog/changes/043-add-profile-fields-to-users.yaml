@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: 043-add-profile-fields-to-users
+      author: system
+      comment: >
+        Rider profile & notification preferences (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §3,
+        issues #111/#112) — display name shown separately from name, and WhatsApp
+        notifications subordinate to Promotion Notification.
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: display_name
+                  type: VARCHAR(120)
+              - column:
+                  name: notifications_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: whatsapp_notifications_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: display_name
+              - column:
+                  name: notifications_enabled
+              - column:
+                  name: whatsapp_notifications_enabled

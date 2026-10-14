@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-add-auto-issue-to-mechanic-settings
+      author: system
+      comment: >
+        Adds autoIssue — whether job cards are issued automatically on
+        booking confirmation vs. requiring a manual mechanic action.
+      changes:
+        - addColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: auto_issue
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: auto_issue

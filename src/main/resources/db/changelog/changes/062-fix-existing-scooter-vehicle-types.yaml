@@ -1,0 +1,63 @@
+databaseChangeLog:
+  - changeSet:
+      id: 062-fix-existing-scooter-vehicle-types
+      author: system
+      context: dev
+      comment: >
+        022-seed-vehicle-catalogue.yaml tagged every two-wheeler MOTORCYCLE because
+        vehicle_type had no SCOOTER value yet. Now that it does (see 061), correct the
+        rows that are actually scooters per the official Make & Model Classification
+        sheet. UPDATE only, by exact (make, model) — no rows are added or removed, so
+        no rider's registered vehicle FK is affected, only its displayed type.
+      changes:
+        - sql:
+            sql: |
+              UPDATE vehicles SET vehicle_type = 'SCOOTER'
+              WHERE vehicle_type = 'MOTORCYCLE' AND (make, model) IN (
+                ('Hero', 'Destini 125'),
+                ('Hero', 'Maestro Edge 110'),
+                ('Honda', 'Activa 125'),
+                ('Honda', 'Activa 6G'),
+                ('Honda', 'Dio'),
+                ('Honda', 'Grazia 125'),
+                ('TVS', 'Jupiter 125'),
+                ('TVS', 'Ntorq 125'),
+                ('Suzuki', 'Access 125'),
+                ('Suzuki', 'Burgman Street 125'),
+                ('Bajaj', 'Chetak Premium'),
+                ('Bajaj', 'Chetak Urbane'),
+                ('Ather', '450S'),
+                ('Ather', '450X'),
+                ('Ather', 'Rizta S'),
+                ('TVS', 'iQube S'),
+                ('TVS', 'iQube ST'),
+                ('Ola Electric', 'S1 Air'),
+                ('Ola Electric', 'S1 Pro'),
+                ('Ola Electric', 'S1 X')
+              );
+      rollback:
+        - sql:
+            sql: |
+              UPDATE vehicles SET vehicle_type = 'MOTORCYCLE'
+              WHERE vehicle_type = 'SCOOTER' AND (make, model) IN (
+                ('Hero', 'Destini 125'),
+                ('Hero', 'Maestro Edge 110'),
+                ('Honda', 'Activa 125'),
+                ('Honda', 'Activa 6G'),
+                ('Honda', 'Dio'),
+                ('Honda', 'Grazia 125'),
+                ('TVS', 'Jupiter 125'),
+                ('TVS', 'Ntorq 125'),
+                ('Suzuki', 'Access 125'),
+                ('Suzuki', 'Burgman Street 125'),
+                ('Bajaj', 'Chetak Premium'),
+                ('Bajaj', 'Chetak Urbane'),
+                ('Ather', '450S'),
+                ('Ather', '450X'),
+                ('Ather', 'Rizta S'),
+                ('TVS', 'iQube S'),
+                ('TVS', 'iQube ST'),
+                ('Ola Electric', 'S1 Air'),
+                ('Ola Electric', 'S1 Pro'),
+                ('Ola Electric', 'S1 X')
+              );

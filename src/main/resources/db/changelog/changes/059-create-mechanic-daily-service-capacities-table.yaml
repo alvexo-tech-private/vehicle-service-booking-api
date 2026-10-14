@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 059-create-mechanic-daily-service-capacities-table
+      author: system
+      comment: >
+        Per-service "1 Day Capacity Change" override (MASTER_BACKEND_MVP_INTEGRATION_SPEC.md
+        v3 §4.6) - mechanic_daily_overrides only had day-level fields
+        (maxVehiclesPerDayOverride etc.); this adds per-service capacity overrides
+        (e.g. "Bike General" 2 -> 4 for one date) as a child table.
+      changes:
+        - createTable:
+            tableName: mechanic_daily_service_capacities
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: daily_override_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: service_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: capacity
+                  type: INT
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_daily_service_capacities
+            baseColumnNames: daily_override_id
+            constraintName: fk_daily_service_capacity_override
+            referencedTableName: mechanic_daily_overrides
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: mechanic_daily_service_capacities
+            columnNames: daily_override_id, service_name
+            constraintName: uq_daily_override_service
+        - createIndex:
+            indexName: idx_daily_service_capacity_override
+            tableName: mechanic_daily_service_capacities
+            columns:
+              - column:
+                  name: daily_override_id
+      rollback:
+        - dropTable:
+            tableName: mechanic_daily_service_capacities

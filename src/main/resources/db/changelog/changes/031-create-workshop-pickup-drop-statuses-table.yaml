@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 031-create-workshop-pickup-drop-statuses-table
+      author: system
+      comment: Pickup & Drop Status (Menu 10) — read-only view, one per workshop.
+      changes:
+        - createTable:
+            tableName: workshop_pickup_drop_statuses
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: facility_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_stage
+                  type: VARCHAR(20)
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_pickup_drop_statuses
+            baseColumnNames: mechanic_id
+            constraintName: fk_wpds_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+      rollback:
+        - dropTable:
+            tableName: workshop_pickup_drop_statuses

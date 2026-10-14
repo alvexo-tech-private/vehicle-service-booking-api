@@ -3,6 +3,8 @@ package com.alvexo.bookingapp.service;
 import com.alvexo.bookingapp.dto.request.AvailabilityRequest;
 import com.alvexo.bookingapp.dto.request.WeeklyAvailabilityRequest;
 import com.alvexo.bookingapp.dto.response.AvailabilityResponse;
+import com.alvexo.bookingapp.dto.response.BookingAvailabilityDateResponse;
+import com.alvexo.bookingapp.dto.response.BookingAvailabilityResponse;
 import com.alvexo.bookingapp.dto.response.BreakWindowResponse;
 import com.alvexo.bookingapp.dto.response.MechanicSearchResponse;
 import com.alvexo.bookingapp.dto.response.SlotResponse;
@@ -12,7 +14,10 @@ import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.*;
 import com.alvexo.bookingapp.repository.BookingRepository;
 import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
+import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
+import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
+import com.alvexo.bookingapp.repository.VehicleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +28,31 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class MechanicService {
 
+    private static final int MAX_AVAILABILITY_RANGE_DAYS = 31;
+
+    // Default working hours applied when a workshop has no explicit mechanic_availability rows.
+    // Mirrors the seed seeded by AuthService.seedDefaultAvailability() for new registrations.
+    private static final LocalTime DEFAULT_OPEN_START  = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_OPEN_END    = LocalTime.of(18, 0);
+    // Sunday is the only default-closed day; Mon–Sat default to open.
+    private static final java.util.EnumSet<DayOfWeek> DEFAULT_CLOSED_DAYS =
+            java.util.EnumSet.of(DayOfWeek.SUNDAY);
+
     @Autowired private MechanicAvailabilityRepository availabilityRepository;
     @Autowired private BookingRepository bookingRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private WorkshopServiceEligibilityService eligibilityService;
+    @Autowired private MechanicSettingsRepository mechanicSettingsRepository;
+    @Autowired private MechanicServiceSettingRepository serviceSettingRepository;
+    @Autowired private VehicleRepository vehicleRepository;
+    @Autowired private MechanicHolidayService holidayService;
 
     // ── Single-day availability ───────────────────────────────────────────────
 
@@ -51,6 +72,22 @@ public class MechanicService {
         return availabilityRepository.findByMechanic(mechanic).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Rider-facing lookup by mechanic id (RIDER_BOOKING_BACKEND_REQUESTS.md
+     * §2) — the endpoints above are self-scoped from the JWT and can't answer
+     * "what are this workshop's hours" for anyone other than the mechanic
+     * themselves. Read-only; any authenticated user may call it.
+     */
+    @Transactional(readOnly = true)
+    public List<AvailabilityResponse> getMechanicAvailabilityById(Long mechanicId) {
+        User mechanic = userRepository.findById(mechanicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found"));
+        if (mechanic.getRole() != UserRole.MECHANIC) {
+            throw new BadRequestException("User is not a mechanic");
+        }
+        return getMechanicAvailability(mechanic);
     }
     
     @Transactional
@@ -159,6 +196,113 @@ public class MechanicService {
      *
      * No DB writes happen — purely a read + compute operation.
      */
+    @Transactional(readOnly = true)
+    public BookingAvailabilityResponse getBookingAvailability(
+            Long mechanicId, ServiceCategory serviceCategory, Long vehicleId, LocalDate from, LocalDate to) {
+        User mechanic = userRepository.findById(mechanicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found"));
+        if (mechanic.getRole() != UserRole.MECHANIC) {
+            throw new BadRequestException("User is not a mechanic");
+        }
+        if (to.isBefore(from)) {
+            throw new BadRequestException("to must not be before from");
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1 > MAX_AVAILABILITY_RANGE_DAYS) {
+            throw new BadRequestException("Range must not exceed " + MAX_AVAILABILITY_RANGE_DAYS + " days");
+        }
+
+        Optional<MechanicSettings> settingsOpt = mechanicSettingsRepository.findByMechanic(mechanic);
+
+        String serviceNotOfferedReason = null;
+        if (serviceCategory != null) {
+            // Only block the date range when the workshop explicitly has a custom service catalog
+            // AND that catalog doesn't contain the requested category.
+            // Basic (Level 1) workshops with an empty catalog are always open for standard services.
+            List<MechanicServiceSetting> activeServices =
+                    serviceSettingRepository.findByMechanicAndIsActiveTrueOrderByDisplayOrderAsc(mechanic);
+            boolean hasCustomCatalog = !activeServices.isEmpty();
+            if (hasCustomCatalog) {
+                boolean offered = activeServices.stream().anyMatch(s -> s.getCategory() == serviceCategory);
+                if (!offered) {
+                    serviceNotOfferedReason = "SERVICE_NOT_OFFERED";
+                }
+            }
+            // If no catalog rows exist, leave serviceNotOfferedReason null → workshop remains bookable.
+        }
+
+        String vehicleNotSupportedReason = null;
+        if (vehicleId != null) {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
+            if (!eligibilityService.isBrandSupported(mechanicId, vehicle.getMake(), vehicle.getFuelType())) {
+                vehicleNotSupportedReason = "VEHICLE_NOT_SUPPORTED";
+            }
+        }
+
+        List<BookingAvailabilityDateResponse> dates = new ArrayList<>();
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            dates.add(buildAvailabilityForDate(mechanic, settingsOpt, serviceCategory, date,
+                    serviceNotOfferedReason, vehicleNotSupportedReason));
+        }
+
+        return new BookingAvailabilityResponse(
+                mechanicId, settingsOpt.map(MechanicSettings::getClassification).orElse(null), dates);
+    }
+
+    private BookingAvailabilityDateResponse buildAvailabilityForDate(
+            User mechanic, Optional<MechanicSettings> settingsOpt, ServiceCategory serviceCategory, LocalDate date,
+            String serviceNotOfferedReason, String vehicleNotSupportedReason) {
+
+        if (settingsOpt.isEmpty()) {
+            return new BookingAvailabilityDateResponse(date, false, "SETTINGS_INCOMPLETE", null, null, List.of());
+        }
+        MechanicSettings settings = settingsOpt.get();
+
+        Optional<MechanicHoliday> holiday = holidayService.findHoliday(mechanic, date);
+        if (holiday.isPresent()) {
+            String reason = holiday.get().getType() == HolidayType.HOLIDAY ? "CLOSED" : "PAUSE";
+            return new BookingAvailabilityDateResponse(date, false, reason, null, null, List.of());
+        }
+
+        DayOfWeek dayOfWeek = DayOfWeek.valueOf(date.getDayOfWeek().name());
+        List<MechanicAvailability> availRows =
+                availabilityRepository.findByMechanicAndDayOfWeek(mechanic, dayOfWeek);
+
+        boolean openThatDay;
+        if (availRows.isEmpty()) {
+            // No explicit availability rows seeded yet — apply default working hours:
+            // Mon–Sat open, Sunday closed. This prevents newly registered workshops from
+            // appearing fully closed before they configure their schedule.
+            openThatDay = !DEFAULT_CLOSED_DAYS.contains(dayOfWeek);
+        } else {
+            openThatDay = availRows.stream().anyMatch(r -> Boolean.TRUE.equals(r.getIsAvailable()));
+        }
+        if (!openThatDay) {
+            return new BookingAvailabilityDateResponse(date, false, "CLOSED", null, null, List.of());
+        }
+
+        if (serviceNotOfferedReason != null) {
+            return new BookingAvailabilityDateResponse(date, false, serviceNotOfferedReason, null, null, List.of());
+        }
+        if (vehicleNotSupportedReason != null) {
+            return new BookingAvailabilityDateResponse(date, false, vehicleNotSupportedReason, null, null, List.of());
+        }
+
+        LocalTime reportingTime = serviceCategory == ServiceCategory.EXPRESS && settings.getExpressReportingTime() != null
+                ? settings.getExpressReportingTime() : settings.getServiceReportingTime();
+
+        Integer remainingCapacity = null;
+        if (!Boolean.TRUE.equals(settings.getReserveCapacity())) {
+            long active = bookingRepository.countActiveBookingsForMechanicOnDate(mechanic, date);
+            remainingCapacity = Math.max(0, settings.getMaxVehiclesPerDay() - (int) active);
+            if (remainingCapacity <= 0) {
+                return new BookingAvailabilityDateResponse(date, false, "FULL", reportingTime, 0, List.of());
+            }
+        }
+
+        return new BookingAvailabilityDateResponse(date, true, null, reportingTime, remainingCapacity, List.of());
+    }
+
     @Transactional(readOnly = true)
     public List<SlotResponse> getAvailableSlots(Long mechanicId, LocalDate date) {
         User mechanic = userRepository.findById(mechanicId)
@@ -332,6 +476,18 @@ public class MechanicService {
     @Transactional(readOnly = true)
     public List<MechanicSearchResponse> searchMechanics(
             String area, String mobileNumber, String pinCode) {
+        return searchMechanics(area, mobileNumber, pinCode, null, null);
+    }
+
+    /**
+     * Overload that additionally computes brand-support fields relative to
+     * {@code vehicleMake}/{@code fuelType} (RIDER_BOOKING_COLLABORATION spec §3 Seam 1).
+     * These two params are layered on top of the existing exactly-one-of
+     * (area, mobile, pinCode) dimension rather than counted against it.
+     */
+    @Transactional(readOnly = true)
+    public List<MechanicSearchResponse> searchMechanics(
+            String area, String mobileNumber, String pinCode, String vehicleMake, FuelType fuelType) {
 
         boolean hasArea    = area != null && !area.isBlank();
         boolean hasMobile  = mobileNumber != null && !mobileNumber.isBlank();
@@ -363,12 +519,18 @@ public class MechanicService {
             results = List.of();
         }
 
+        boolean hasVehicleMake = vehicleMake != null && !vehicleMake.isBlank();
         return results.stream()
-                .map(this::convertToMechanicSearchResponse)
+                .map(user -> convertToMechanicSearchResponse(user, hasVehicleMake ? vehicleMake.trim() : null, fuelType))
                 .collect(Collectors.toList());
     }
-    
-    private MechanicSearchResponse convertToMechanicSearchResponse(User user) {
+
+    private MechanicSearchResponse convertToMechanicSearchResponse(User user, String vehicleMake, FuelType fuelType) {
+        List<String> supportedBrands = eligibilityService.getSupportedBrands(user.getId());
+        Boolean isBrandSupported = vehicleMake != null
+                ? eligibilityService.isBrandSupported(user.getId(), vehicleMake, fuelType)
+                : null;
+
         return new MechanicSearchResponse(
                 user.getId(),
                 user.getFirstName(),
@@ -387,7 +549,11 @@ public class MechanicService {
                 user.getTotalBookingsCompleted(),
                 user.getBio(),
                 user.getLatitude(),
-                user.getLongitude()
+                user.getLongitude(),
+                supportedBrands,
+                isBrandSupported,
+                user.getProfileImageUrl(),
+                user.getActive()
         );
     }
 }

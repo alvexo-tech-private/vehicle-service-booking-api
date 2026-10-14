@@ -17,4 +17,7 @@ public interface UserVehicleRepository extends JpaRepository<UserVehicle, Long> 
     Optional<UserVehicle> findByUserAndVehicle(User user, Vehicle vehicle);
     Optional<UserVehicle> findByUserAndIsPrimaryTrue(User user);
     boolean existsByUserAndVehicle(User user, Vehicle vehicle);
+
+    /** Used to resolve a plate number back to (customer, vehicle) for the reminder notify endpoint. */
+    Optional<UserVehicle> findByRegistrationNumberIgnoreCase(String registrationNumber);
 }

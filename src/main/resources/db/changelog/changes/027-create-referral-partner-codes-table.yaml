@@ -1,0 +1,103 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-create-referral-partner-codes-table
+      author: system
+      comment: >
+        Catalogue of referral codes usable during workshop onboarding (Menu 6).
+        Seeded with demo partner codes matching the spec's sample values.
+      changes:
+        - createTable:
+            tableName: referral_partner_codes
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: code
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: partner_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: benefit
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expired
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: referral_partner_codes
+
+  - changeSet:
+      id: 027a-seed-referral-partner-codes
+      author: system
+      comment: Seed demo referral codes.
+      changes:
+        - insert:
+            tableName: referral_partner_codes
+            columns:
+              - column: { name: code, value: SALES100 }
+              - column: { name: partner_name, value: "Sales Team" }
+              - column: { name: benefit, value: "Waived onboarding fee" }
+              - column: { name: active, valueBoolean: true }
+              - column: { name: expired, valueBoolean: false }
+        - insert:
+            tableName: referral_partner_codes
+            columns:
+              - column: { name: code, value: WORKSHOP50 }
+              - column: { name: partner_name, value: "Workshop Partner Program" }
+              - column: { name: benefit, value: "50% off onboarding fee" }
+              - column: { name: active, valueBoolean: true }
+              - column: { name: expired, valueBoolean: false }
+        - insert:
+            tableName: referral_partner_codes
+            columns:
+              - column: { name: code, value: MECH20 }
+              - column: { name: partner_name, value: "Mechanic Referral Program" }
+              - column: { name: benefit, value: "20% off onboarding fee" }
+              - column: { name: active, valueBoolean: true }
+              - column: { name: expired, valueBoolean: false }
+        - insert:
+            tableName: referral_partner_codes
+            columns:
+              - column: { name: code, value: PARTNER10 }
+              - column: { name: partner_name, value: "Business Partner Program" }
+              - column: { name: benefit, value: "10% off onboarding fee" }
+              - column: { name: active, valueBoolean: true }
+              - column: { name: expired, valueBoolean: false }
+        - insert:
+            tableName: referral_partner_codes
+            columns:
+              - column: { name: code, value: EXPIRED1 }
+              - column: { name: partner_name, value: "Legacy Promotion" }
+              - column: { name: benefit, value: "N/A" }
+              - column: { name: active, valueBoolean: true }
+              - column: { name: expired, valueBoolean: true }
+        - insert:
+            tableName: referral_partner_codes
+            columns:
+              - column: { name: code, value: INACTIVE1 }
+              - column: { name: partner_name, value: "Suspended Partner" }
+              - column: { name: benefit, value: "N/A" }
+              - column: { name: active, valueBoolean: false }
+              - column: { name: expired, valueBoolean: false }

@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 052-migrate-legacy-level3-4-to-level2
+      author: Antigravity
+      comment: >
+        Workshop settings now only support Level 1 (Basic) and Level 2 (Advanced).
+        Any workshop that was previously configured as Level 3 (MECHANIC / reserveForSlots=false)
+        or Level 4 (MECHANIC / reserveForSlots=true) is migrated to Level 2 (Advanced):
+        job_card_type = AUTO, reserve_capacity = true, reserve_for_slots = false,
+        classification = TYPE_2. The move to reserveCapacity=true means these workshops
+        now use the hour-slot capacity model; full_day_capacity_hours is set to 8 hours
+        as a safe default where it was previously NULL.
+      changes:
+        - sql:
+            sql: |
+              UPDATE mechanic_settings
+              SET
+                job_card_type        = 'AUTO',
+                reserve_capacity     = true,
+                reserve_for_slots    = false,
+                classification       = 'TYPE_2',
+                full_day_capacity_hours = COALESCE(full_day_capacity_hours, 8)
+              WHERE job_card_type = 'MECHANIC'
+                 OR classification IN ('TYPE_3', 'TYPE_4');

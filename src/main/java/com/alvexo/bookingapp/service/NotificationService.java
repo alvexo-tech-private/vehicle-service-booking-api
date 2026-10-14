@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alvexo.bookingapp.exception.BusinessRuleException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.Notification;
 import com.alvexo.bookingapp.model.NotificationType;
@@ -26,7 +27,6 @@ import com.sendgrid.SendGrid;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
-import com.sendgrid.helpers.mail.objects.Personalization;
 
 @Service
 public class NotificationService {
@@ -34,7 +34,7 @@ public class NotificationService {
     @Autowired
     private NotificationRepository notificationRepository;
     
-    @Autowired
+    @Autowired(required = false)
     private JavaMailSender mailSender;
     
     @Value("${app.toemail.address:info@alvexotech.com}")
@@ -75,6 +75,10 @@ public class NotificationService {
     }
     
     public void sendOtpEmailOld(String mobileNumber, String otp) {
+        if (mailSender == null) {
+            System.err.println("Mail sender not configured. Cannot send OTP email.");
+            return;
+        }
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmailAddress.split(","));
@@ -84,64 +88,60 @@ public class NotificationService {
         mailSender.send(message);
     }
     
-    public void sendOtpEmail(String mobileNumber, String otp)   {
-
-        Email from = new Email(fromEmail);
-        Email toEmail = new Email(toEmailAddress);
-        
-        Personalization personalization = new Personalization();
-		personalization.addTo(new Email("srisivas362@gmail.com"));
-		personalization.addTo(new Email("daniv.james@gmail.com"));
-		personalization.addTo(new Email("sureshksmech@gmail.com"));
-
-        Content emailContent = new Content("text/plain", "OTP for mobile number " + mobileNumber + " is: " + otp);
-        Mail mail = new Mail(from, "Your OTP Code for "+mobileNumber, toEmail, emailContent);
-        
-		mail.addPersonalization(personalization);
-
-        SendGrid sg = new SendGrid(sendGridApiKey);
-        Request request = new Request();
-
-        request.setMethod(Method.POST);
-        request.setEndpoint("mail/send");
-        Response response=null;
-        try {
-			request.setBody(mail.build());
-			response = sg.api(request);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-
-        System.out.println("Status Code: " + response.getStatusCode());
+    public void sendOtpEmail(String mobileNumber, String email, String otp) {
+        if (email == null || email.isBlank()) {
+            throw new BusinessRuleException("EMAIL_DELIVERY_FAILED",
+                    "No email on file for this account; SMS delivery is not yet available");
+        }
+        sendOtpViaSendGrid(email, "Your OTP Code for " + mobileNumber,
+                "OTP for mobile number " + mobileNumber + " is: " + otp);
     }
     
     // ── Contact-detail change OTP delivery ────────────────────────────────────
+    // Sent via the SendGrid HTTP API rather than JavaMailSender/SMTP: Render
+    // blocks outbound SMTP ports (25/465/587), so a direct SMTP send always
+    // times out there regardless of mail config.
 
     /**
      * Sends an OTP to the user's <em>new</em> email address so they can prove
      * ownership before the address is committed to the account.
      */
     public void sendEmailChangeOtp(String newEmail, String otp) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(newEmail);
-        message.setSubject("Verify your new email address");
-        message.setText("Your OTP to verify your new email address is: " + otp
-                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
-        mailSender.send(message);
+        sendOtpViaSendGrid(newEmail, "Verify your new email address",
+                "Your OTP to verify your new email address is: " + otp
+                        + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
     }
 
     /**
-     * Sends an OTP to the user's <em>current</em> email address so they can
-     * authorise a mobile number change. (SMS delivery is not yet implemented.)
+     * Sends an OTP to verify a workshop owner's WhatsApp number.
+     * (SMS/WhatsApp delivery is not yet implemented — delivered via the owner's account email.)
      */
-    public void sendMobileChangeOtp(String currentEmail, String otp) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(currentEmail);
-        message.setSubject("Verify your new mobile number");
-        message.setText("Your OTP to verify your new mobile number is: " + otp
-                + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
-        mailSender.send(message);
+    public void sendWhatsappVerificationOtp(String accountEmail, String otp) {
+        sendOtpViaSendGrid(accountEmail, "Verify your WhatsApp number",
+                "Your OTP to verify your WhatsApp number is: " + otp
+                        + "\nThis code is valid for 5 minutes. Do not share it with anyone.");
+    }
+
+    private void sendOtpViaSendGrid(String toAddress, String subject, String body) {
+        Email from = new Email(fromEmail);
+        Email to = new Email(toAddress);
+        Content content = new Content("text/plain", body);
+        Mail mail = new Mail(from, subject, to, content);
+
+        SendGrid sg = new SendGrid(sendGridApiKey);
+        Request request = new Request();
+        request.setMethod(Method.POST);
+        request.setEndpoint("mail/send");
+        try {
+            request.setBody(mail.build());
+            Response response = sg.api(request);
+            if (response.getStatusCode() >= 400) {
+                throw new BusinessRuleException("EMAIL_DELIVERY_FAILED",
+                        "Failed to send email: SendGrid returned " + response.getStatusCode());
+            }
+        } catch (IOException e) {
+            throw new BusinessRuleException("EMAIL_DELIVERY_FAILED", "Failed to send email");
+        }
     }
 
     @Transactional

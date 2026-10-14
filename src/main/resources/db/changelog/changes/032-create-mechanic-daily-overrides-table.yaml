@@ -1,0 +1,79 @@
+databaseChangeLog:
+  - changeSet:
+      id: 032-create-mechanic-daily-overrides-table
+      author: system
+      comment: >
+        Creates mechanic_daily_overrides — per-date capacity/advance
+        overrides (spec §7 Home "One-Day Capacity & Advance Change"). Null
+        fields fall back to the mechanic's standing MechanicSettings value.
+      changes:
+        - createTable:
+            tableName: mechanic_daily_overrides
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: date
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: max_vehicles_per_day_override
+                  type: INT
+
+              - column:
+                  name: full_day_capacity_hours_override
+                  type: DECIMAL(5,2)
+
+              - column:
+                  name: advance_enabled_override
+                  type: BOOLEAN
+
+              - column:
+                  name: advance_amount_override
+                  type: DECIMAL(10,2)
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_daily_overrides
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_daily_overrides_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - addUniqueConstraint:
+            tableName: mechanic_daily_overrides
+            columnNames: mechanic_id, date
+            constraintName: uq_mechanic_daily_overrides_mechanic_date
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_daily_overrides
