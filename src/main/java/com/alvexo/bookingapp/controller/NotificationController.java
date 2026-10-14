@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
+import com.alvexo.bookingapp.dto.response.NotificationResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
-import com.alvexo.bookingapp.model.Notification;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.service.NotificationService;
@@ -37,24 +37,26 @@ public class NotificationController {
     @Operation(summary = "Get notifications", description = "Returns paginated notifications for the authenticated user, newest first.")
 
     @GetMapping
-    public ResponseEntity<MyApiResponse<Page<Notification>>> getNotifications(
+    public ResponseEntity<MyApiResponse<Page<NotificationResponse>>> getNotifications(
             Pageable pageable,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        Page<Notification> notifications = notificationService.getUserNotifications(user, pageable);
+
+        Page<NotificationResponse> notifications =
+                notificationService.getUserNotifications(user, pageable).map(NotificationResponse::from);
         return ResponseEntity.ok(MyApiResponse.success(notifications));
     }
-    
+
     @Operation(summary = "Get unread notifications", description = "Returns all unread notifications for the authenticated user.")
     @GetMapping("/unread")
-    public ResponseEntity<MyApiResponse<List<Notification>>> getUnreadNotifications(
+    public ResponseEntity<MyApiResponse<List<NotificationResponse>>> getUnreadNotifications(
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        List<Notification> notifications = notificationService.getUnreadNotifications(user);
+
+        List<NotificationResponse> notifications = notificationService.getUnreadNotifications(user).stream()
+                .map(NotificationResponse::from).collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(MyApiResponse.success(notifications));
     }
     

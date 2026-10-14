@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-add-channel-to-bookings
+      author: system
+      comment: >
+        Adds channel to bookings (ONLINE/WALK_IN/RIDER_APP) so the Home
+        dashboard can report walk-in and rider-app counters. Existing rows
+        default to ONLINE since that was the only channel before this change.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: channel
+                  type: VARCHAR(20)
+                  defaultValue: ONLINE
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: channel

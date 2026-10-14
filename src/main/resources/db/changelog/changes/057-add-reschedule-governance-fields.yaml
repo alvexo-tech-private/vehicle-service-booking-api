@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: 057-add-reschedule-governance-fields
+      author: system
+      comment: >
+        BACKEND_MVP_FLOW_RIDER_WORKSHOP_LIFECYCLE.md §3 Scenario A — reschedule
+        was previously unlimited (no cutoff, no per-booking limit, no count
+        tracking). Adds the workshop-level governance fields and the
+        per-booking counter.
+      changes:
+        - addColumn:
+            tableName: mechanic_settings
+            columns:
+              - column:
+                  name: reschedule_limit
+                  type: INT
+                  defaultValueNumeric: 2
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reschedule_cutoff_time
+                  type: TIME
+                  defaultValue: "17:00:00"
+                  constraints:
+                    nullable: false
+
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: reschedule_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropColumn:
+            tableName: mechanic_settings
+            columnName: reschedule_limit
+        - dropColumn:
+            tableName: mechanic_settings
+            columnName: reschedule_cutoff_time
+        - dropColumn:
+            tableName: bookings
+            columnName: reschedule_count

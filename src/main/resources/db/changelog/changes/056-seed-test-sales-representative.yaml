@@ -1,0 +1,74 @@
+databaseChangeLog:
+  - changeSet:
+      id: 056-seed-test-sales-representative
+      author: system
+      context: dev
+      runOnChange: false
+      comment: >
+        Static, pre-verified SALES_REPRESENTATIVE test account for manual/QA
+        testing (this role has no public self-registration endpoint, so it
+        can only be created via seed or by an admin). Logs in via
+        /api/auth/login (email or mobile + PIN) with no OTP/SMS step needed.
+        Credentials: test.sales@alvexotech.com / 9000000003 / PIN 1234.
+
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 0
+            sql: SELECT COUNT(*) FROM users WHERE email = 'test.sales@alvexotech.com'
+
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: first_name
+                  value: Test
+
+              - column:
+                  name: last_name
+                  value: Sales
+
+              - column:
+                  name: password
+                  value: $2a$10$KbK9ZdAoPKohKj2pRo65XupdhDymVLUE5oQzQ4Nc2ZEp7QAqHFURC
+
+              - column:
+                  name: role
+                  value: SALES_REPRESENTATIVE
+
+              - column:
+                  name: email
+                  value: test.sales@alvexotech.com
+
+              - column:
+                  name: mobile_number
+                  value: 9000000003
+
+              - column:
+                  name: city
+                  value: Chennai
+
+              - column:
+                  name: referral_code
+                  value: TESTSALES01
+
+              - column:
+                  name: active
+                  valueBoolean: true
+
+              - column:
+                  name: email_verified
+                  valueBoolean: true
+
+              - column:
+                  name: mobile_verified
+                  valueBoolean: true
+
+              - column:
+                  name: created_at
+                  valueDate: NOW()
+
+              - column:
+                  name: updated_at
+                  valueDate: NOW()

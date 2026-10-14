@@ -44,4 +44,9 @@ public class UserResponse {
     private Integer totalReferrals;
     private BigDecimal totalBonusEarned;
     private LocalDateTime createdAt;
+
+    /** Effective display name — raw displayName if set, else falls back to name (RIDER_PROFILE spec §3). */
+    private String displayName;
+    private Boolean notificationsEnabled;
+    private Boolean whatsappNotificationsEnabled;
 }

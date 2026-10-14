@@ -1,0 +1,81 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-create-workshop-owner-infos-table
+      author: system
+      comment: Owner Information (Menu 2) — one row per workshop.
+      changes:
+        - createTable:
+            tableName: workshop_owner_infos
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: owner_name
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: primary_phone
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: secondary_phone
+                  type: VARCHAR(20)
+              - column:
+                  name: whatsapp_number
+                  type: VARCHAR(20)
+              - column:
+                  name: whatsapp_verified
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(150)
+              - column:
+                  name: id_proof_file_id
+                  type: BIGINT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workshop_owner_infos
+            baseColumnNames: mechanic_id
+            constraintName: fk_woi_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: workshop_owner_infos
+            baseColumnNames: id_proof_file_id
+            constraintName: fk_woi_id_proof_file
+            referencedTableName: stored_files
+            referencedColumnNames: id
+            onDelete: SET NULL
+            onUpdate: CASCADE
+      rollback:
+        - dropTable:
+            tableName: workshop_owner_infos

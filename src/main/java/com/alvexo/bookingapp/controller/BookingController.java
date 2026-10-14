@@ -3,6 +3,9 @@ package com.alvexo.bookingapp.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,7 +19,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+
+import com.alvexo.bookingapp.dto.request.BookingCancelRequest;
 import com.alvexo.bookingapp.dto.request.BookingRequest;
+import com.alvexo.bookingapp.dto.request.WalkInBookingRequest;
 import com.alvexo.bookingapp.dto.response.BookingResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
@@ -33,13 +40,16 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
-    
+
     @Autowired
     private BookingService bookingService;
-    
+
     @Autowired
     private UserRepository userRepository;
-    
+
+    @Autowired
+    private com.alvexo.bookingapp.service.PaymentService paymentService;
+
     @Operation(summary = "Create a booking", description = "Vehicle user creates a new service booking with a mechanic.")
     @PostMapping
     public ResponseEntity<MyApiResponse<BookingResponse>> createBooking(
@@ -47,47 +57,217 @@ public class BookingController {
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         BookingResponse response = bookingService.createBooking(request, user);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(MyApiResponse.success("Booking created successfully", response));
     }
-    
-    @Operation(summary = "Get my bookings", description = "Returns paginated list of bookings for the currently authenticated user.")
+
+    @Operation(summary = "Get my bookings", description = "Returns paginated list of bookings for the currently authenticated user, "
+            + "newest-scheduled-first by default. Includes every status (upcoming, active, completed, cancelled).")
     @GetMapping("/my-bookings")
     public ResponseEntity<MyApiResponse<Page<BookingResponse>>> getMyBookings(
-            Pageable pageable,
+            @PageableDefault(size = 20, sort = "scheduledDateTime", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         Page<BookingResponse> bookings = bookingService.getUserBookings(user, pageable);
         return ResponseEntity.ok(MyApiResponse.success(bookings));
     }
-    
-    @Operation(summary = "Get booking by ID", description = "Returns full details of a specific booking. User must be the customer or the mechanic.")
+
+    @Operation(summary = "Get booking by ID",
+               description = "Returns full details of a specific booking. User must be the customer or the mechanic. "
+                            + "{id} accepts either the numeric database id or the canonical bookingNumber (e.g. \"1888 TN 0881\").")
     @GetMapping("/{id}")
     public ResponseEntity<MyApiResponse<BookingResponse>> getBookingById(
-            @PathVariable Long id,
+            @PathVariable String id,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        BookingResponse booking = bookingService.getBookingById(id, user);
+
+        BookingResponse booking = bookingService.getBookingById(bookingService.resolveBookingId(id), user);
         return ResponseEntity.ok(MyApiResponse.success(booking));
     }
-    
+
     @Operation(summary = "Update booking status", description = "Mechanic or admin updates the status of a booking (e.g. CONFIRMED, COMPLETED, CANCELLED).")
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('MECHANIC', 'ADMINISTRATOR')")   
+    @PreAuthorize("hasAnyRole('MECHANIC', 'ADMINISTRATOR')")
     public ResponseEntity<MyApiResponse<BookingResponse>> updateBookingStatus(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestParam BookingStatus status,
             Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        BookingResponse response = bookingService.updateBookingStatus(id, status, user);
+
+        BookingResponse response = bookingService.updateBookingStatus(bookingService.resolveBookingId(id), status, user);
         return ResponseEntity.ok(MyApiResponse.success("Booking status updated", response));
+    }
+
+    @Operation(summary = "Cancel my booking",
+               description = "Vehicle user cancels a booking they created. Only PENDING or CONFIRMED bookings can be cancelled.")
+    @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> cancelBooking(
+            @PathVariable String id,
+            @Valid @RequestBody BookingCancelRequest request,
+            Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.cancelBookingAsRider(
+                bookingService.resolveBookingId(id), user, request.getReason());
+        return ResponseEntity.ok(MyApiResponse.success("Booking cancelled", response));
+    }
+
+    @Operation(summary = "Record a walk-in booking",
+               description = "Mechanic records a walk-in customer at the workshop. Confirmed immediately, " +
+                              "tagged channel = WALK_IN, and still subject to the mechanic's capacity/advance rules.")
+    @PostMapping("/walk-in")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> createWalkInBooking(
+            @Valid @RequestBody WalkInBookingRequest request,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.createWalkInBooking(request, mechanic);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(MyApiResponse.success("Walk-in booking recorded successfully", response));
+    }
+
+    @Operation(summary = "Reschedule a booking",
+               description = "The assigned mechanic or the booking's own vehicle user moves it to a new date/time "
+                            + "(RIDER_BOOKING_TO_WORKSHOP.md §5: rider can \"modify\"), subject to the same conflict checks as a new booking.")
+    @PutMapping("/{id}/reschedule")
+    @PreAuthorize("hasAnyRole('MECHANIC', 'VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> rescheduleBooking(
+            @PathVariable String id,
+            @RequestParam("scheduledDateTime")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime newScheduledDateTime,
+            Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.rescheduleBooking(
+                bookingService.resolveBookingId(id), newScheduledDateTime, user);
+        return ResponseEntity.ok(MyApiResponse.success("Booking rescheduled successfully", response));
+    }
+
+    @Operation(summary = "Propose an alternate date",
+               description = "Mechanic proposes moving an over-capacity booking to a new date/time. "
+                            + "scheduledDateTime does not change until the rider accepts via /proposal-response.")
+    @PostMapping("/{id}/propose-date")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> proposeDate(
+            @PathVariable String id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.ProposeDateRequest request,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.proposeDate(
+                bookingService.resolveBookingId(id), mechanic, request.getProposedDateTime());
+        return ResponseEntity.ok(MyApiResponse.success("Alternate date proposed", response));
+    }
+
+    @Operation(summary = "Accept or decline a proposed alternate date",
+               description = "Rider responds to a pending propose-date. Accepting moves the booking to the "
+                            + "proposed date; declining cancels the booking.")
+    @PostMapping("/{id}/proposal-response")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> respondToProposal(
+            @PathVariable String id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.ProposalResponseRequest request,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.respondToProposal(
+                bookingService.resolveBookingId(id), rider, Boolean.TRUE.equals(request.getAccept()));
+        String message = Boolean.TRUE.equals(request.getAccept()) ? "Proposal accepted" : "Proposal declined; booking cancelled";
+        return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
+    @Operation(summary = "Workshop accepts/rejects a Today Approval request",
+               description = "Accepting starts a confirmation window (returns confirmationExpiresAt/requiredAdvance) "
+                            + "without reserving capacity yet; the rider must call /confirm-request next.")
+    @PostMapping("/{id}/workshop-decision")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.WorkshopDecisionResponse>> workshopDecision(
+            @PathVariable String id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.WorkshopDecisionRequest request,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        var response = bookingService.workshopDecision(
+                bookingService.resolveBookingId(id), mechanic, Boolean.TRUE.equals(request.getAccept()));
+        String message = Boolean.TRUE.equals(request.getAccept()) ? "Request accepted" : "Request rejected";
+        return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
+    @Operation(summary = "Rider confirms an accepted Today Approval request",
+               description = "Reserves capacity and schedules the booking if no advance is owed. If an advance is "
+                            + "still owed, returns paymentRequired=true instead — pay via /payment-intent, then call this again.")
+    @PostMapping("/{id}/confirm-request")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.ConfirmRequestResponse>> confirmRequest(
+            @PathVariable String id,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        var response = bookingService.confirmRequest(bookingService.resolveBookingId(id), rider);
+        String message = response.paymentRequired() ? "Advance payment required" : "Booking confirmed";
+        return ResponseEntity.ok(MyApiResponse.success(message, response));
+    }
+
+    @Operation(summary = "Create a payment intent for a booking",
+               description = "Computes the required advance + platform fee for the booking's current state "
+                            + "(§6). Returns 0/0 when nothing is currently owed.")
+    @PostMapping("/{id}/payment-intent")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<com.alvexo.bookingapp.dto.response.PaymentIntentResponse>> createPaymentIntent(
+            @PathVariable String id,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Long bookingId = bookingService.resolveBookingId(id);
+        return ResponseEntity.ok(MyApiResponse.success(paymentService.createBookingPaymentIntent(rider, bookingId)));
+    }
+
+    @Operation(summary = "Pay a booking's advance",
+               description = "Records an advance payment the rider already completed client-side (UPI/card/etc.) "
+                            + "against this booking, and moves the booking forward (PENDING_PAYMENT -> SCHEDULED, "
+                            + "or PENDING -> CONFIRMED).")
+    @PostMapping("/{id}/pay-advance")
+    @PreAuthorize("hasRole('VEHICLE_USER')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> payAdvance(
+            @PathVariable String id,
+            @Valid @RequestBody com.alvexo.bookingapp.dto.request.PayAdvanceRequest request,
+            Authentication authentication) {
+        User rider = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.payAdvance(
+                bookingService.resolveBookingId(id), rider, request.getAmount(), request.getPaymentTransactionId());
+        return ResponseEntity.ok(MyApiResponse.success("Advance payment processed successfully", response));
+    }
+
+    @Operation(summary = "Issue job card manually",
+               description = "For mechanics with autoIssue = false: issues a job card for an already-CONFIRMED booking.")
+    @PutMapping("/{id}/issue-job-card")
+    @PreAuthorize("hasRole('MECHANIC')")
+    public ResponseEntity<MyApiResponse<BookingResponse>> issueJobCard(
+            @PathVariable String id,
+            Authentication authentication) {
+        User mechanic = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        BookingResponse response = bookingService.issueJobCard(bookingService.resolveBookingId(id), mechanic);
+        return ResponseEntity.ok(MyApiResponse.success("Job card issued", response));
     }
 }

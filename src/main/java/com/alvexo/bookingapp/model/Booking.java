@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -59,6 +60,14 @@ public class Booking {
     private BookingStatus status;
 
     /**
+     * Service Desk sub-state while status = IN_PROGRESS (Arrived vs Pending).
+     * Null before arrival and once status leaves IN_PROGRESS.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_stage", length = 20)
+    private ServiceDeskStage serviceStage;
+
+    /**
      * STANDARD — vehicle reports at or after mechanic's serviceReportingTime.
      * EXPRESS  — vehicle reports before mechanic's expressReportingTime
      *            (only when mechanic's reserveCapacity = true).
@@ -71,6 +80,12 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     @Column(name = "service_type", nullable = false)
     private ServiceType serviceType;
+
+    /** ONLINE (customer app) / WALK_IN (recorded by mechanic) / RIDER_APP. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "channel", nullable = false, length = 20)
+    @Builder.Default
+    private BookingChannel channel = BookingChannel.ONLINE;
     
     @Column(columnDefinition = "TEXT", nullable = false)
     private String description;
@@ -104,17 +119,113 @@ public class Booking {
     
     @Column(name = "cancellation_reason", columnDefinition = "TEXT")
     private String cancellationReason;
-    
+
+    /**
+     * Customer-facing cancellation message shown by the Service Desk Cancel
+     * action (spec §1.7/§2.5) — distinct from the internal cancellationReason.
+     */
+    @Column(name = "cancellation_message", columnDefinition = "TEXT")
+    private String cancellationMessage;
+
+    /**
+     * Unused as of BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §8 — cancellation no longer
+     * carries any penalty. Column kept (always null going forward) rather than dropped, so any
+     * pre-existing historical values aren't destroyed.
+     */
+    @Column(name = "reliability_adjustment_amount", precision = 10, scale = 2)
+    private BigDecimal reliabilityAdjustmentAmount;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cancelled_by")
     private User cancelledBy;
-    
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
-    
+
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
-    
+
+    // ── Service Desk fields (pickup / drop / carry-over) ────────────────────
+
+    @Column(name = "pickup_required", nullable = false)
+    @Builder.Default
+    private Boolean pickupRequired = false;
+
+    @Column(name = "drop_required", nullable = false)
+    @Builder.Default
+    private Boolean dropRequired = false;
+
+    @Column(name = "pickup_address", columnDefinition = "TEXT")
+    private String pickupAddress;
+
+    @Column(name = "delivery_address", columnDefinition = "TEXT")
+    private String deliveryAddress;
+
+    /** Junior mechanic assigned to pick the vehicle up — distinct from the servicing mechanic. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pickup_mechanic_id")
+    private MechanicMasterEntry pickupMechanic;
+
+    /** Junior mechanic assigned to drop the vehicle back — distinct from the servicing mechanic. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "drop_mechanic_id")
+    private MechanicMasterEntry dropMechanic;
+
+    @Column(name = "delivered_by", length = 100)
+    private String deliveredBy;
+
+    @Column(name = "delivered_on")
+    private LocalDate deliveredOn;
+
+    /** True once this booking is carried over from a previous, unfinished service day. */
+    @Column(name = "is_carry_over", nullable = false)
+    @Builder.Default
+    private Boolean isCarryOver = false;
+
+    /**
+     * Reference to a rider-recorded voice note describing the problem
+     * (RIDER_BOOKING_TO_WORKSHOP.md §3.2) — uploaded out-of-band and stored
+     * here purely as a reference (e.g. a StoredFile id/filename), not a blob.
+     */
+    @Column(name = "audio_reference", length = 255)
+    private String audioReference;
+
+    @Column(name = "engine_oil_replacement", nullable = false)
+    @Builder.Default
+    private Boolean engineOilReplacement = false;
+
+    /**
+     * Alternate Date Proposal flow (RIDER_BOOKING_COLLABORATION spec §3 Seam 5) — the
+     * workshop's over-capacity reassignment offered to the rider for accept/decline,
+     * distinct from a direct reschedule since scheduledDateTime doesn't move until accepted.
+     */
+    @Column(name = "proposed_date_time")
+    private LocalDateTime proposedDateTime;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "proposal_status", nullable = false, length = 20)
+    @Builder.Default
+    private BookingProposalStatus proposalStatus = BookingProposalStatus.NONE;
+
+    /** Client-supplied dedup key for POST /api/bookings (§4). Null for bookings created before this existed. */
+    @Column(name = "idempotency_key", unique = true, length = 100)
+    private String idempotencyKey;
+
+    /** Incremented on every successful rider/mechanic reschedule; governs the mechanic's rescheduleLimit. */
+    @Column(name = "reschedule_count", nullable = false)
+    @Builder.Default
+    private Integer rescheduleCount = 0;
+
+    // ── Today Approval two-stage flow (§5) ────────────────────────────────────
+
+    /** Set when the workshop accepts a REQUESTED booking; the rider must confirm before this passes. */
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+
+    /** Advance the workshop requires before confirming, decided at accept time. Null once paid/not applicable. */
+    @Column(name = "required_advance_amount", precision = 10, scale = 2)
+    private BigDecimal requiredAdvanceAmount;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

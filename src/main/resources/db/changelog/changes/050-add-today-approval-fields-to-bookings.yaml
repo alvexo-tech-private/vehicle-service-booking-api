@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 050-add-today-approval-fields-to-bookings
+      author: system
+      comment: >
+        Today Approval two-stage flow (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §5) —
+        REQUESTED -> workshop accepts (PENDING_PAYMENT, confirmationExpiresAt set) -> rider
+        confirms (SCHEDULED) or the window lapses (EXPIRED).
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: confirmation_expires_at
+                  type: TIMESTAMP
+              - column:
+                  name: required_advance_amount
+                  type: DECIMAL(10,2)
+      rollback:
+        - dropColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: confirmation_expires_at
+              - column:
+                  name: required_advance_amount

@@ -1,0 +1,89 @@
+databaseChangeLog:
+  - changeSet:
+      id: 033-create-mechanic-settings-audit-logs-table
+      author: system
+      comment: >
+        Creates mechanic_settings_audit_logs — field-level change history for
+        MechanicSettings and MechanicConfigurationSettings (spec §7 Settings
+        Audit). One row per changed field per save.
+      changes:
+        - createTable:
+            tableName: mechanic_settings_audit_logs
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: mechanic_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: entity_type
+                  type: VARCHAR(40)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: field_name
+                  type: VARCHAR(60)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: old_value
+                  type: VARCHAR(500)
+
+              - column:
+                  name: new_value
+                  type: VARCHAR(500)
+
+              - column:
+                  name: changed_by
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: changed_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_settings_audit_logs
+            baseColumnNames: mechanic_id
+            constraintName: fk_mechanic_settings_audit_logs_mechanic
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: mechanic_settings_audit_logs
+            baseColumnNames: changed_by
+            constraintName: fk_mechanic_settings_audit_logs_changed_by
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - createIndex:
+            indexName: idx_mechanic_settings_audit_logs_mechanic_changed_at
+            tableName: mechanic_settings_audit_logs
+            columns:
+              - column:
+                  name: mechanic_id
+              - column:
+                  name: changed_at
+
+      rollback:
+        - dropTable:
+            tableName: mechanic_settings_audit_logs

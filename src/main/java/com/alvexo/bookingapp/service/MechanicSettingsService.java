@@ -2,17 +2,26 @@ package com.alvexo.bookingapp.service;
 
 import com.alvexo.bookingapp.dto.request.MechanicServiceSettingRequest;
 import com.alvexo.bookingapp.dto.request.MechanicSettingsRequest;
+import com.alvexo.bookingapp.dto.request.MechanicServiceSlotsRequest;
+import com.alvexo.bookingapp.dto.request.ServiceSlotRequest;
 import com.alvexo.bookingapp.dto.response.MechanicServiceSettingResponse;
 import com.alvexo.bookingapp.dto.response.MechanicSettingsResponse;
+import com.alvexo.bookingapp.dto.response.MechanicServiceSlotResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.model.*;
 import com.alvexo.bookingapp.repository.MechanicServiceSettingRepository;
+import com.alvexo.bookingapp.repository.MechanicServiceSlotRepository;
 import com.alvexo.bookingapp.repository.MechanicSettingsRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,11 +29,17 @@ public class MechanicSettingsService {
 
     private final MechanicSettingsRepository settingsRepository;
     private final MechanicServiceSettingRepository serviceSettingRepository;
+    private final MechanicServiceSlotRepository serviceSlotRepository;
+    private final MechanicSettingsAuditLogService auditLogService;
 
     public MechanicSettingsService(MechanicSettingsRepository settingsRepository,
-                                   MechanicServiceSettingRepository serviceSettingRepository) {
+                                   MechanicServiceSettingRepository serviceSettingRepository,
+                                   MechanicServiceSlotRepository serviceSlotRepository,
+                                   MechanicSettingsAuditLogService auditLogService) {
         this.settingsRepository = settingsRepository;
         this.serviceSettingRepository = serviceSettingRepository;
+        this.serviceSlotRepository = serviceSlotRepository;
+        this.auditLogService = auditLogService;
     }
 
     // ── Create or replace all settings (upsert) ───────────────────────────────
@@ -37,8 +52,14 @@ public class MechanicSettingsService {
         MechanicSettings settings = settingsRepository.findByMechanic(mechanic)
                 .orElse(MechanicSettings.builder().mechanic(mechanic).build());
 
+        MechanicSettings before = settings.getId() != null ? copyOf(settings) : null;
+
         applyRequest(settings, request);
         settings = settingsRepository.save(settings);
+
+        if (before != null) {
+            logSettingsChanges(mechanic, before, settings);
+        }
 
         // Replace service settings if provided
         if (request.getServiceSettings() != null) {
@@ -55,6 +76,10 @@ public class MechanicSettingsService {
         validateRole(mechanic);
         MechanicSettings settings = settingsRepository.findByMechanic(mechanic)
                 .orElseThrow(() -> new ResourceNotFoundException("Settings not configured yet"));
+        // Normalize any legacy Level 3/4 rows to Level 2 (Advanced) transparently.
+        // The DB migration (052) handles existing rows at startup, but this guard
+        // ensures even rows that pre-date the migration read cleanly.
+        normalizeLegacyLevel(settings);
         return buildResponse(settings);
     }
 
@@ -62,6 +87,7 @@ public class MechanicSettingsService {
     public MechanicSettingsResponse getSettingsByMechanicId(Long mechanicId) {
         MechanicSettings settings = settingsRepository.findByMechanicId(mechanicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Settings not found for mechanic " + mechanicId));
+        normalizeLegacyLevel(settings);
         return buildResponse(settings);
     }
 
@@ -84,6 +110,7 @@ public class MechanicSettingsService {
                 .orElseThrow(() -> new ResourceNotFoundException("Service setting not found"));
 
         entity.setServiceName(request.getServiceName());
+        entity.setCategory(request.getCategory());
         entity.setDurationMinutes(request.getDurationMinutes());
         entity.setMaxSlotsPerDay(request.getMaxSlotsPerDay());
         if (request.getIsExpressEligible() != null) entity.setIsExpressEligible(request.getIsExpressEligible());
@@ -156,6 +183,50 @@ public class MechanicSettingsService {
         return BookingType.STANDARD;
     }
 
+    // ── Audit ─────────────────────────────────────────────────────────────────
+
+    /** Shallow snapshot of the audited fields, taken before applyRequest overwrites them. */
+    private MechanicSettings copyOf(MechanicSettings s) {
+        return MechanicSettings.builder()
+                .jobCardType(s.getJobCardType())
+                .maxVehiclesPerDay(s.getMaxVehiclesPerDay())
+                .reserveCapacity(s.getReserveCapacity())
+                .reserveForSlots(s.getReserveForSlots())
+                .fullDayCapacityHours(s.getFullDayCapacityHours())
+                .jobCardSerialPrefix(s.getJobCardSerialPrefix())
+                .serviceReportingTime(s.getServiceReportingTime())
+                .expressReportingTime(s.getExpressReportingTime())
+                .advanceEnabled(s.getAdvanceEnabled())
+                .advanceAmount(s.getAdvanceAmount())
+                .autoAllocationEnabled(s.getAutoAllocationEnabled())
+                .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
+                .autoIssue(s.getAutoIssue())
+                .allowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours())
+                .rescheduleLimit(s.getRescheduleLimit())
+                .rescheduleCutoffTime(s.getRescheduleCutoffTime())
+                .build();
+    }
+
+    private void logSettingsChanges(User mechanic, MechanicSettings before, MechanicSettings after) {
+        String entityType = "MECHANIC_SETTINGS";
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "jobCardType", before.getJobCardType(), after.getJobCardType());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "maxVehiclesPerDay", before.getMaxVehiclesPerDay(), after.getMaxVehiclesPerDay());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "reserveCapacity", before.getReserveCapacity(), after.getReserveCapacity());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "reserveForSlots", before.getReserveForSlots(), after.getReserveForSlots());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "fullDayCapacityHours", before.getFullDayCapacityHours(), after.getFullDayCapacityHours());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "jobCardSerialPrefix", before.getJobCardSerialPrefix(), after.getJobCardSerialPrefix());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "serviceReportingTime", before.getServiceReportingTime(), after.getServiceReportingTime());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "expressReportingTime", before.getExpressReportingTime(), after.getExpressReportingTime());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "advanceEnabled", before.getAdvanceEnabled(), after.getAdvanceEnabled());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "advanceAmount", before.getAdvanceAmount(), after.getAdvanceAmount());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationEnabled", before.getAutoAllocationEnabled(), after.getAutoAllocationEnabled());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoAllocationCapacityHours", before.getAutoAllocationCapacityHours(), after.getAutoAllocationCapacityHours());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "autoIssue", before.getAutoIssue(), after.getAutoIssue());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "allowGeneralUseExpressHours", before.getAllowGeneralUseExpressHours(), after.getAllowGeneralUseExpressHours());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "rescheduleLimit", before.getRescheduleLimit(), after.getRescheduleLimit());
+        auditLogService.logIfChanged(mechanic, mechanic, entityType, "rescheduleCutoffTime", before.getRescheduleCutoffTime(), after.getRescheduleCutoffTime());
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void validateRole(User mechanic) {
@@ -165,10 +236,23 @@ public class MechanicSettingsService {
     }
 
     private void validateSettingsRequest(MechanicSettingsRequest r) {
+        // Workshop Settings v2: only Level 1 (Basic) — jobCardType=AUTO, reserveCapacity=false
+        // and Level 2 (Advanced) — jobCardType=AUTO, reserveCapacity=true — are accepted.
+        // Level 3/4 (jobCardType=MECHANIC) are legacy-only; the DB migration (052) migrates
+        // existing rows and the API boundary below prevents new ones from being created.
+        if (r.getJobCardType() == JobCardType.MECHANIC) {
+            throw new BadRequestException(
+                    "Only Level 1 (Basic) and Level 2 (Advanced) are supported. " +
+                    "jobCardType MECHANIC (Level 3/4) is no longer accepted.");
+        }
+        if (r.getJobCardType() == JobCardType.AUTO && Boolean.TRUE.equals(r.getReserveForSlots())) {
+            throw new BadRequestException("reserveForSlots must be false when jobCardType is AUTO");
+        }
+        if (r.getJobCardType() == JobCardType.AUTO && !Boolean.TRUE.equals(r.getReserveCapacity())
+                && (r.getMaxVehiclesPerDay() == null || r.getMaxVehiclesPerDay() < 1)) {
+            throw new BadRequestException("maxVehiclesPerDay must be a positive number for Level 1 (Basic)");
+        }
         if (Boolean.TRUE.equals(r.getReserveCapacity())) {
-            if (r.getFullDayCapacityHours() == null) {
-                throw new BadRequestException("fullDayCapacityHours is required when reserveCapacity is true");
-            }
             if (r.getExpressReportingTime() == null) {
                 throw new BadRequestException("expressReportingTime is required when reserveCapacity is true");
             }
@@ -179,34 +263,132 @@ public class MechanicSettingsService {
         if (Boolean.TRUE.equals(r.getAdvanceEnabled()) && r.getAdvanceAmount() == null) {
             throw new BadRequestException("advanceAmount is required when advanceEnabled is true");
         }
+        if (Boolean.TRUE.equals(r.getAutoAllocationEnabled()) && r.getAutoAllocationCapacityHours() == null) {
+            throw new BadRequestException("autoAllocationCapacityHours is required when autoAllocationEnabled is true");
+        }
     }
 
     private void applyRequest(MechanicSettings s, MechanicSettingsRequest r) {
+        s.setJobCardType(r.getJobCardType());
         s.setMaxVehiclesPerDay(r.getMaxVehiclesPerDay());
-        s.setReserveCapacity(r.getReserveCapacity());
+        // reserveCapacity and reserveForSlots are mutually exclusive per jobCardType;
+        // normalize the unused flag to false rather than trusting the client value.
+        s.setReserveCapacity(r.getJobCardType() == JobCardType.AUTO && Boolean.TRUE.equals(r.getReserveCapacity()));
+        s.setReserveForSlots(r.getJobCardType() == JobCardType.MECHANIC && Boolean.TRUE.equals(r.getReserveForSlots()));
+        s.setClassification(deriveClassification(s.getJobCardType(), s.getReserveCapacity(), s.getReserveForSlots()));
         s.setFullDayCapacityHours(r.getFullDayCapacityHours());
         s.setJobCardSerialPrefix(r.getJobCardSerialPrefix());
         s.setServiceReportingTime(r.getServiceReportingTime());
         s.setExpressReportingTime(r.getExpressReportingTime());
         s.setAdvanceEnabled(r.getAdvanceEnabled());
         s.setAdvanceAmount(r.getAdvanceAmount());
+        s.setAutoAllocationEnabled(r.getAutoAllocationEnabled());
+        s.setAutoAllocationCapacityHours(r.getAutoAllocationCapacityHours());
+        s.setAutoIssue(r.getAutoIssue());
+        if (r.getServiceAllocations() != null) s.setServiceAllocations(r.getServiceAllocations());
+        if (r.getAllowGeneralUseExpressHours() != null) s.setAllowGeneralUseExpressHours(r.getAllowGeneralUseExpressHours());
+        if (r.getRescheduleLimit() != null) s.setRescheduleLimit(r.getRescheduleLimit());
+        if (r.getRescheduleCutoffTime() != null) s.setRescheduleCutoffTime(r.getRescheduleCutoffTime());
     }
 
+    /**
+     * Level 1 -> TYPE_1 (AUTO, reserveCapacity=false)
+     * Level 2 -> TYPE_2 (AUTO, reserveCapacity=true)
+     * Level 3/4 (MECHANIC) are legacy and no longer created; any existing rows are
+     * normalized to Level 2 via normalizeLegacyLevel().
+     */
+    private WorkshopClassification deriveClassification(JobCardType jobCardType,
+                                                          Boolean reserveCapacity,
+                                                          Boolean reserveForSlots) {
+        if (jobCardType == JobCardType.AUTO) {
+            return Boolean.TRUE.equals(reserveCapacity) ? WorkshopClassification.TYPE_2 : WorkshopClassification.TYPE_1;
+        }
+        // Should not reach here post-migration; treat as Level 2 (Advanced) for safety.
+        return WorkshopClassification.TYPE_2;
+    }
+
+    /**
+     * In-memory normalization of a legacy Level 3 (TYPE_3) or Level 4 (TYPE_4) settings
+     * entity to Level 2 (Advanced — TYPE_2). Does NOT persist — the DB migration handles
+     * persisted rows. This is a read-path safety guard for rows that may have been inserted
+     * before the migration ran, or in test environments.
+     *
+     * Rules:
+     *  - jobCardType  → AUTO
+     *  - reserveCapacity → true (enables hour-slot mode)
+     *  - reserveForSlots → false
+     *  - classification  → TYPE_2
+     *  - fullDayCapacityHours → kept as-is if present; defaulted to 8h if null
+     */
+    private void normalizeLegacyLevel(MechanicSettings s) {
+        if (s.getJobCardType() != JobCardType.MECHANIC
+                && s.getClassification() != WorkshopClassification.TYPE_3
+                && s.getClassification() != WorkshopClassification.TYPE_4) {
+            return; // already Level 1 or Level 2 — nothing to do
+        }
+        s.setJobCardType(JobCardType.AUTO);
+        s.setReserveCapacity(true);
+        s.setReserveForSlots(false);
+        s.setClassification(WorkshopClassification.TYPE_2);
+        if (s.getFullDayCapacityHours() == null) {
+            s.setFullDayCapacityHours(java.math.BigDecimal.valueOf(8));
+        }
+    }
+
+    /**
+     * Replaces the mechanic's service catalogue with the requested rows.
+     * Matches existing rows by serviceName and updates them in place (rather
+     * than delete-all-then-insert) so a service that already has booking
+     * history keeps its id and the booking's FK stays valid. Rows removed
+     * from the request are hard-deleted when unreferenced, or soft-deleted
+     * (isActive=false) when a booking still points at them.
+     */
     private void replaceServiceSettings(User mechanic, List<MechanicServiceSettingRequest> requests) {
         List<MechanicServiceSetting> existing =
                 serviceSettingRepository.findByMechanicOrderByDisplayOrderAsc(mechanic);
-        serviceSettingRepository.deleteAll(existing);
 
-        List<MechanicServiceSetting> fresh = requests.stream()
-                .map(r -> buildServiceSetting(mechanic, r))
+        Map<String, MechanicServiceSetting> existingByName = existing.stream()
+                .collect(Collectors.toMap(MechanicServiceSetting::getServiceName, s -> s, (a, b) -> a));
+        Set<String> requestedNames = requests.stream()
+                .map(MechanicServiceSettingRequest::getServiceName)
+                .collect(Collectors.toSet());
+
+        List<MechanicServiceSetting> toSave = requests.stream()
+                .map(r -> {
+                    MechanicServiceSetting entity = existingByName.get(r.getServiceName());
+                    if (entity == null) {
+                        return buildServiceSetting(mechanic, r);
+                    }
+                    entity.setCategory(r.getCategory());
+                    entity.setDurationMinutes(r.getDurationMinutes());
+                    entity.setMaxSlotsPerDay(r.getMaxSlotsPerDay());
+                    entity.setIsExpressEligible(r.getIsExpressEligible() != null ? r.getIsExpressEligible() : false);
+                    entity.setIsActive(r.getIsActive() != null ? r.getIsActive() : true);
+                    entity.setDisplayOrder(r.getDisplayOrder() != null ? r.getDisplayOrder() : 0);
+                    return entity;
+                })
                 .collect(Collectors.toList());
-        serviceSettingRepository.saveAll(fresh);
+        serviceSettingRepository.saveAll(toSave);
+
+        List<MechanicServiceSetting> removed = existing.stream()
+                .filter(s -> !requestedNames.contains(s.getServiceName()))
+                .collect(Collectors.toList());
+        for (MechanicServiceSetting service : removed) {
+            try {
+                serviceSettingRepository.delete(service);
+                serviceSettingRepository.flush();
+            } catch (DataIntegrityViolationException e) {
+                service.setIsActive(false);
+                serviceSettingRepository.save(service);
+            }
+        }
     }
 
     private MechanicServiceSetting buildServiceSetting(User mechanic, MechanicServiceSettingRequest r) {
         return MechanicServiceSetting.builder()
                 .mechanic(mechanic)
                 .serviceName(r.getServiceName())
+                .category(r.getCategory())
                 .durationMinutes(r.getDurationMinutes())
                 .maxSlotsPerDay(r.getMaxSlotsPerDay())
                 .isExpressEligible(r.getIsExpressEligible() != null ? r.getIsExpressEligible() : false)
@@ -224,15 +406,25 @@ public class MechanicSettingsService {
                 .id(s.getId())
                 .mechanicId(s.getMechanic().getId())
                 .mechanicName(s.getMechanic().getFirstName() + " " + s.getMechanic().getLastName())
+                .jobCardType(s.getJobCardType())
+                .classification(s.getClassification())
                 .maxVehiclesPerDay(s.getMaxVehiclesPerDay())
                 .reserveCapacity(s.getReserveCapacity())
+                .reserveForSlots(s.getReserveForSlots())
                 .fullDayCapacityHours(s.getFullDayCapacityHours())
                 .jobCardSerialPrefix(s.getJobCardSerialPrefix())
                 .serviceReportingTime(s.getServiceReportingTime())
                 .expressReportingTime(s.getExpressReportingTime())
                 .advanceEnabled(s.getAdvanceEnabled())
                 .advanceAmount(s.getAdvanceAmount())
+                .autoAllocationEnabled(s.getAutoAllocationEnabled())
+                .autoAllocationCapacityHours(s.getAutoAllocationCapacityHours())
+                .autoIssue(s.getAutoIssue())
                 .serviceSettings(services)
+                .serviceAllocations(s.getServiceAllocations())
+                .allowGeneralUseExpressHours(s.getAllowGeneralUseExpressHours())
+                .rescheduleLimit(s.getRescheduleLimit())
+                .rescheduleCutoffTime(s.getRescheduleCutoffTime())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
                 .build();
@@ -242,6 +434,7 @@ public class MechanicSettingsService {
         return MechanicServiceSettingResponse.builder()
                 .id(e.getId())
                 .serviceName(e.getServiceName())
+                .category(e.getCategory())
                 .durationMinutes(e.getDurationMinutes())
                 .maxSlotsPerDay(e.getMaxSlotsPerDay())
                 .isExpressEligible(e.getIsExpressEligible())
@@ -255,5 +448,72 @@ public class MechanicSettingsService {
         return settingsRepository.findByMechanicId(mechanicId)
                 .map(MechanicSettings::getMechanic)
                 .orElseThrow(() -> new ResourceNotFoundException("Mechanic not found: " + mechanicId));
+    }
+
+    // ── Service slots (Slot 1 / Slot 2 — Level 4) ─────────────────────────────
+
+    /**
+     * Create-or-update semantics: each item in the request is upserted by
+     * (mechanic, slotNumber). Slots omitted from the request are left untouched.
+     */
+    @Transactional
+    public List<MechanicServiceSlotResponse> saveServiceSlots(User mechanic, MechanicServiceSlotsRequest request) {
+        validateRole(mechanic);
+
+        if (!settingsRepository.existsByMechanic(mechanic)) {
+            throw new BadRequestException("Mechanic settings must be created before saving service slots");
+        }
+
+        Set<Integer> seen = new HashSet<>();
+        for (ServiceSlotRequest item : request.getSlots()) {
+            if (!seen.add(item.getSlotNumber())) {
+                throw new BadRequestException("Duplicate slotNumber in request: " + item.getSlotNumber());
+            }
+            if (Boolean.TRUE.equals(item.getEnabled() == null ? Boolean.TRUE : item.getEnabled())
+                    && item.getSlotTime() == null) {
+                throw new BadRequestException("slotTime is required for slot " + item.getSlotNumber() + " when enabled");
+            }
+        }
+
+        List<MechanicServiceSlot> saved = request.getSlots().stream()
+                .map(item -> {
+                    MechanicServiceSlot slot = serviceSlotRepository
+                            .findByMechanicAndSlotNumber(mechanic, item.getSlotNumber())
+                            .orElse(MechanicServiceSlot.builder()
+                                    .mechanic(mechanic)
+                                    .slotNumber(item.getSlotNumber())
+                                    .build());
+                    slot.setSlotTime(item.getSlotTime());
+                    slot.setRepairQty(item.getRepairQty());
+                    slot.setEnabled(item.getEnabled() == null ? Boolean.TRUE : item.getEnabled());
+                    return serviceSlotRepository.save(slot);
+                })
+                .collect(Collectors.toList());
+
+        return saved.stream()
+                .sorted(Comparator.comparing(MechanicServiceSlot::getSlotNumber))
+                .map(this::toSlotResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MechanicServiceSlotResponse> getServiceSlots(Long mechanicId) {
+        if (!settingsRepository.existsByMechanicId(mechanicId)) {
+            throw new ResourceNotFoundException("Settings not found for mechanic " + mechanicId);
+        }
+        return serviceSlotRepository.findByMechanicIdOrderBySlotNumberAsc(mechanicId)
+                .stream().map(this::toSlotResponse).collect(Collectors.toList());
+    }
+
+    private MechanicServiceSlotResponse toSlotResponse(MechanicServiceSlot s) {
+        return MechanicServiceSlotResponse.builder()
+                .id(s.getId())
+                .slotNumber(s.getSlotNumber())
+                .slotTime(s.getSlotTime())
+                .repairQty(s.getRepairQty())
+                .enabled(s.getEnabled())
+                .createdAt(s.getCreatedAt())
+                .updatedAt(s.getUpdatedAt())
+                .build();
     }
 }

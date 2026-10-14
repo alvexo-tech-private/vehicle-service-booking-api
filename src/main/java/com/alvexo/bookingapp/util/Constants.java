@@ -30,7 +30,95 @@ public class Constants {
     
     // Payment
     public static final String DEFAULT_CURRENCY = "USD";
-    
+
+    // Workshop profile — onboarding
+    public static final java.math.BigDecimal WORKSHOP_ONBOARDING_FEE = new java.math.BigDecimal("1000.00");
+
+    // Workshop profile — images / support attachments
+    public static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024 * 1024;   // 5 MB
+    public static final long MAX_SUPPORT_IMAGE_SIZE_BYTES = 2L * 1024 * 1024; // 2 MB
+    public static final java.util.Set<String> ALLOWED_IMAGE_CONTENT_TYPES =
+            java.util.Set.of("image/jpeg", "image/jpg", "image/png", "image/webp");
+    public static final int SUPPORT_DESCRIPTION_MAX_WORDS = 200;
+
+    // Workshop profile — platform verification
+    public static final int PLATFORM_VERIFICATION_MIN_METHODS = 2;
+
+    public static final String DEFAULT_CANCELLATION_MESSAGE =
+            "Due to unavoidable circumstances, your service has been cancelled. "
+            + "We are sorry for the inconvenience caused.";
+
+    // Workshop profile — location
+    public static final java.util.Set<String> INDIAN_STATES = java.util.Set.of(
+            "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
+            "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh",
+            "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+            "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+            "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
+            "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh",
+            "Lakshadweep", "Puducherry"
+    );
+
+    // Canonical Booking ID series (MASTER_BACKEND_MVP_INTEGRATION_SPEC.md v3 §4.11) — maps a
+    // workshop's registered INDIAN_STATES value to the 2-letter vehicle-registration (RTO) code
+    // used as the center segment of bookingNumber (e.g. "Tamil Nadu" -> "TN" in "1888 TN 0881").
+    // Falls back to "IN" for workshops that haven't completed location onboarding yet.
+    public static final String DEFAULT_STATE_CODE = "IN";
+    public static final java.util.Map<String, String> INDIAN_STATE_CODES = java.util.Map.ofEntries(
+            java.util.Map.entry("Andhra Pradesh", "AP"),
+            java.util.Map.entry("Arunachal Pradesh", "AR"),
+            java.util.Map.entry("Assam", "AS"),
+            java.util.Map.entry("Bihar", "BR"),
+            java.util.Map.entry("Chhattisgarh", "CG"),
+            java.util.Map.entry("Goa", "GA"),
+            java.util.Map.entry("Gujarat", "GJ"),
+            java.util.Map.entry("Haryana", "HR"),
+            java.util.Map.entry("Himachal Pradesh", "HP"),
+            java.util.Map.entry("Jharkhand", "JH"),
+            java.util.Map.entry("Karnataka", "KA"),
+            java.util.Map.entry("Kerala", "KL"),
+            java.util.Map.entry("Madhya Pradesh", "MP"),
+            java.util.Map.entry("Maharashtra", "MH"),
+            java.util.Map.entry("Manipur", "MN"),
+            java.util.Map.entry("Meghalaya", "ML"),
+            java.util.Map.entry("Mizoram", "MZ"),
+            java.util.Map.entry("Nagaland", "NL"),
+            java.util.Map.entry("Odisha", "OD"),
+            java.util.Map.entry("Punjab", "PB"),
+            java.util.Map.entry("Rajasthan", "RJ"),
+            java.util.Map.entry("Sikkim", "SK"),
+            java.util.Map.entry("Tamil Nadu", "TN"),
+            java.util.Map.entry("Telangana", "TS"),
+            java.util.Map.entry("Tripura", "TR"),
+            java.util.Map.entry("Uttar Pradesh", "UP"),
+            java.util.Map.entry("Uttarakhand", "UK"),
+            java.util.Map.entry("West Bengal", "WB"),
+            java.util.Map.entry("Andaman and Nicobar Islands", "AN"),
+            java.util.Map.entry("Chandigarh", "CH"),
+            java.util.Map.entry("Dadra and Nagar Haveli and Daman and Diu", "DD"),
+            java.util.Map.entry("Delhi", "DL"),
+            java.util.Map.entry("Jammu and Kashmir", "JK"),
+            java.util.Map.entry("Ladakh", "LA"),
+            java.util.Map.entry("Lakshadweep", "LD"),
+            java.util.Map.entry("Puducherry", "PY")
+    );
+
+    // Settlement (BACKEND_REQUIREMENTS_FULL_APP_WORKSHOP_RIDER.md §6/§10) — flat handling fee
+    // deducted from the advance per booking; there is no other workshop fee and no penalty.
+    public static final java.math.BigDecimal ADVANCE_HANDLING_FEE = new java.math.BigDecimal("10.00");
+    public static final int SETTLEMENT_CUSTOM_RANGE_MAX_DAYS = 7;
+    public static final int SETTLEMENT_CUSTOM_RANGE_LOOKBACK_DAYS = 30;
+    public static final int SETTLEMENT_LATEST_LOOKBACK_DAYS = 60;
+
+    // Rider payment contract (§6) — distinct ledger leg from ADVANCE_HANDLING_FEE: this is added
+    // to what the rider pays, the settlement fee is subtracted from what the workshop receives.
+    // Numerically identical today but tracked separately since they can diverge independently.
+    public static final java.math.BigDecimal RIDER_PLATFORM_FEE = new java.math.BigDecimal("10.00");
+
+    // Today Approval two-stage flow (§5) — how long a rider has to confirm/pay after the
+    // workshop accepts, before the request lapses back to EXPIRED.
+    public static final int TODAY_APPROVAL_CONFIRMATION_WINDOW_MINUTES = 15;
+
     private Constants() {
         // Private constructor to prevent instantiation
     }

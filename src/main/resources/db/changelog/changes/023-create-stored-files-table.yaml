@@ -1,0 +1,67 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-create-stored-files-table
+      author: system
+      comment: >
+        Generic uploaded-file metadata (workshop images, ID proofs, support attachments).
+        Binary content lives on local disk under app.upload.dir; this row tracks ownership
+        for download authorisation.
+      changes:
+        - createTable:
+            tableName: stored_files
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: owner_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: original_filename
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: size_bytes
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: storage_path
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: stored_files
+            baseColumnNames: owner_id
+            constraintName: fk_stored_files_owner
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - createIndex:
+            indexName: idx_stored_files_owner
+            tableName: stored_files
+            columns:
+              - column:
+                  name: owner_id
+      rollback:
+        - dropTable:
+            tableName: stored_files

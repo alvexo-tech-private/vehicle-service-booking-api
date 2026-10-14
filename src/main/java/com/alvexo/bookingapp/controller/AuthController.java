@@ -11,12 +11,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.alvexo.bookingapp.dto.response.CaptchaChallengeResponse;
+import com.alvexo.bookingapp.dto.response.CheckPhoneResponse;
 import com.alvexo.bookingapp.dto.response.MyApiResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.model.UserRole;
 import com.alvexo.bookingapp.service.AuthService;
+import com.alvexo.bookingapp.service.CaptchaService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,12 +39,48 @@ public class AuthController {
 	@Autowired
 	private AuthService authService;
 
+	@Autowired
+	private CaptchaService captchaService;
+
 	@Operation(summary = "Get available user types", description = "Returns the two self-registration roles: VEHICLE_USER and MECHANIC.")
 	@ApiResponses(@ApiResponse(responseCode = "200", description = "List returned successfully"))
 	@GetMapping("/user-types")
 	public ResponseEntity<MyApiResponse<List<UserRole>>> getUserTypes() {
 		List<UserRole> userTypes = authService.getUserTypes();
 		return ResponseEntity.ok(MyApiResponse.success("User types retrieved successfully", userTypes));
+	}
+
+	@Operation(summary = "Check if a phone number is registered",
+		description = "Pre-flight lookup so the app can prompt \"Not yet registered? Please sign up.\" "
+			+ "before asking for a PIN, instead of after a failed login attempt.")
+	@ApiResponses(@ApiResponse(responseCode = "200", description = "Lookup completed (check `data.exists`)"))
+	@GetMapping("/check-phone")
+	public ResponseEntity<MyApiResponse<CheckPhoneResponse>> checkPhone(@RequestParam String phone) {
+		CheckPhoneResponse response = authService.checkPhone(phone);
+		String message = response.isExists() ? "Registered user found" : response.getMessage();
+		return ResponseEntity.ok(MyApiResponse.success(message, response));
+	}
+
+	@Operation(summary = "Get a captcha challenge",
+		description = "Returns a 5-digit numeric code (and the id to submit it back under) that must be solved "
+			+ "before /api/auth/request-otp will issue an OTP. Expires in 5 minutes.")
+	@ApiResponses(@ApiResponse(responseCode = "200", description = "Captcha generated"))
+	@GetMapping("/captcha")
+	public ResponseEntity<MyApiResponse<CaptchaChallengeResponse>> getCaptcha() {
+		return ResponseEntity.ok(MyApiResponse.success("Captcha generated", captchaService.generateChallenge()));
+	}
+
+	@Operation(summary = "Request an OTP with captcha validation",
+		description = "Same delivery as /send-otp, but requires a solved captcha first — the "
+			+ "misuse-prevention gate for \"Forgot PIN\" and similar OTP requests.")
+	@ApiResponses({
+		@ApiResponse(responseCode = "200", description = "OTP sent successfully"),
+		@ApiResponse(responseCode = "400", description = "Invalid/expired captcha (errorCode: INVALID_CAPTCHA), or mobile number not found")
+	})
+	@PostMapping("/request-otp")
+	public ResponseEntity<MyApiResponse<String>> requestOtp(@Valid @RequestBody RequestOtpRequest request) {
+		authService.requestOtp(request);
+		return ResponseEntity.ok(MyApiResponse.success("OTP sent", "SUCCESS"));
 	}
 
 	@Operation(summary = "Register a vehicle user",

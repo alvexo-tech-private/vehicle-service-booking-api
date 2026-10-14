@@ -11,21 +11,29 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alvexo.bookingapp.dto.response.CheckPhoneResponse;
 import com.alvexo.bookingapp.dto.response.TokenResponse;
 import com.alvexo.bookingapp.exception.BadRequestException;
 import com.alvexo.bookingapp.exception.ResourceNotFoundException;
 import com.alvexo.bookingapp.exception.UnauthorizedException;
+import com.alvexo.bookingapp.model.DayOfWeek;
+import com.alvexo.bookingapp.model.MechanicAvailability;
 import com.alvexo.bookingapp.model.RefreshToken;
 import com.alvexo.bookingapp.model.User;
 import com.alvexo.bookingapp.model.UserRole;
+import com.alvexo.bookingapp.repository.MechanicAvailabilityRepository;
 import com.alvexo.bookingapp.repository.RefreshTokenRepository;
 import com.alvexo.bookingapp.repository.UserRepository;
 import com.alvexo.bookingapp.security.JwtTokenProvider;
 import com.alvexo.bookingapp.util.MobileNumberUtil;
 
+import java.time.LocalTime;
+import java.util.EnumSet;
+import java.util.List;
+
 @Service
 public class AuthService {
-    
+
 	private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,6 +42,9 @@ public class AuthService {
     private final ReferralService referralService;
     private final OtpService otpService;
     private final NotificationService notificationService;
+    private final MechanicAvailabilityRepository availabilityRepository;
+    private final CaptchaService captchaService;
+    private final TwilioVerifyService twilioVerifyService;
 
     public AuthService(
             UserRepository userRepository,
@@ -43,7 +54,10 @@ public class AuthService {
             JwtTokenProvider tokenProvider,
             ReferralService referralService,
             OtpService otpService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            MechanicAvailabilityRepository availabilityRepository,
+            CaptchaService captchaService,
+            TwilioVerifyService twilioVerifyService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,6 +66,34 @@ public class AuthService {
         this.referralService = referralService;
         this.otpService = otpService;
         this.notificationService = notificationService;
+        this.availabilityRepository = availabilityRepository;
+        this.captchaService = captchaService;
+        this.twilioVerifyService = twilioVerifyService;
+    }
+
+    /**
+     * Default weekly hours seeded for every newly registered workshop so it's
+     * bookable immediately, rather than silently closed on every day until
+     * the mechanic manually opens each one (RIDER_BOOKING_BACKEND_REQUESTS.md
+     * §1 — "no availability row" was being read as permanently closed with no
+     * indication why). Monday–Saturday 09:00–18:00, Sunday closed; the
+     * mechanic can change any of this via the existing availability screens.
+     */
+    private static final LocalTime DEFAULT_START_TIME = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_END_TIME = LocalTime.of(18, 0);
+    private static final EnumSet<DayOfWeek> DEFAULT_CLOSED_DAYS = EnumSet.of(DayOfWeek.SUNDAY);
+
+    private void seedDefaultAvailability(User mechanic) {
+        List<MechanicAvailability> defaults = List.of(DayOfWeek.values()).stream()
+                .map(day -> MechanicAvailability.builder()
+                        .mechanic(mechanic)
+                        .dayOfWeek(day)
+                        .startTime(DEFAULT_START_TIME)
+                        .endTime(DEFAULT_END_TIME)
+                        .isAvailable(!DEFAULT_CLOSED_DAYS.contains(day))
+                        .build())
+                .toList();
+        availabilityRepository.saveAll(defaults);
     }
     
     @Transactional
@@ -152,12 +194,54 @@ public class AuthService {
 
         String mobile = MobileNumberUtil.normalize(mobileNumber);
 
-        User user = userRepository.findByMobileNumber(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        userRepository.findByMobileNumber(mobile)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        String otp = otpService.generateAndSaveOtp(mobile);
+        twilioVerifyService.startVerification(mobile);
+    }
 
-        notificationService.sendOtpEmail(mobile, otp);
+    /**
+     * Pre-flight lookup so the app can show "Not yet registered? Please sign up."
+     * before asking for a PIN (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §1).
+     */
+    public CheckPhoneResponse checkPhone(String phone) {
+        String mobile = MobileNumberUtil.normalize(phone);
+
+        return userRepository.findByMobileNumber(mobile)
+                .map(user -> CheckPhoneResponse.builder()
+                        .exists(true)
+                        .role(user.getRole())
+                        .isVerified(user.getMobileVerified())
+                        .build())
+                .orElseGet(() -> CheckPhoneResponse.builder()
+                        .exists(false)
+                        .message("Not yet registered? Please sign up.")
+                        .build());
+    }
+
+    /**
+     * Captcha-gated OTP request (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §2 —
+     * OTP misuse prevention). Validates the captcha first, then sends the OTP.
+     *
+     * <p>Purpose changes which existence check applies: {@code REGISTRATION}
+     * verifies a phone number that must <em>not</em> be registered yet (the
+     * user doesn't exist as an account until registration completes), while
+     * every other purpose (login, forgot-PIN, ...) requires an existing user,
+     * same as {@link #sendOtp}.
+     */
+    public void requestOtp(RequestOtpRequest request) {
+        captchaService.validateAndConsume(request.getCaptchaId(), request.getCaptchaResponse());
+
+        String mobile = MobileNumberUtil.normalize(request.getPhone());
+
+        if ("REGISTRATION".equalsIgnoreCase(request.getPurpose())) {
+            if (userRepository.existsByMobileNumber(mobile)) {
+                throw new BadRequestException("This mobile number is already registered. Please log in instead.");
+            }
+            twilioVerifyService.startVerification(mobile);
+        } else {
+            sendOtp(mobile);
+        }
     }
 
 
@@ -167,10 +251,10 @@ public class AuthService {
 
         String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
 
-        otpService.validateOtp(mobile, request.getOtp());
+        twilioVerifyService.checkVerification(mobile, request.getOtp());
 
         User user = userRepository.findByMobileNumber(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return createTokenResponse(user, request.getDeviceId(), request.getDeviceType());
     }
@@ -182,15 +266,15 @@ public class AuthService {
     
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
-
         // If the username looks like a phone number (no @), normalise it before lookup
         String username = request.getUsername();
         String normalizedUsername = !username.contains("@")
                 ? MobileNumberUtil.normalize(username)
                 : username;
+
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(normalizedUsername, request.getPassword())
+        );
 
         User user = userRepository.findByEmail(normalizedUsername)
                 .or(() -> userRepository.findByMobileNumber(normalizedUsername))
@@ -286,16 +370,21 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse registerVehicleUser(VehicleUserRegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
+
+        String email = request.getEmail();
+        if (email == null || email.isBlank()) {
+            // Email column is NOT NULL/UNIQUE and doubles as the JWT/login username,
+            // so synthesize one from the (already unique) mobile number when omitted.
+            email = mobile + "@no-email.alvexo.app";
+        } else if (userRepository.existsByEmail(email)) {
             throw new BadRequestException("Email already registered");
         }
-
-        String mobile = MobileNumberUtil.normalize(request.getMobileNumber());
 
         if (userRepository.existsByMobileNumber(mobile)) {
             throw new BadRequestException("Mobile number already registered");
         }
-        
+
         if(!request.getPin().equals((request.getConfirmPin()))){
         	throw new BadRequestException("PIN and confirm PIN should be same");
         }
@@ -304,7 +393,7 @@ public class AuthService {
                 .firstName(request.getName())
                 .lastName("")
                 .mobileNumber(mobile)
-                .email(request.getEmail())
+                .email(email)
                 .city(request.getCity())
                 .area(request.getArea())
                 .password(passwordEncoder.encode(String.valueOf(request.getPin())))
@@ -349,6 +438,7 @@ public class AuthService {
                 .build();
 
         user = userRepository.save(user);
+        seedDefaultAvailability(user);
         return createTokenResponse(user);
     }
 
@@ -521,10 +611,8 @@ public class AuthService {
     }
 
     /**
-     * Sends an OTP to the user's <em>current</em> email address so they can
-     * authorise a mobile number change.
-     *
-     * <p>(SMS delivery is not yet implemented; the OTP is delivered via email.)
+     * Sends an SMS OTP (via Twilio Verify) to the <em>new</em> mobile number so
+     * the user can prove ownership before it's committed to the account.
      *
      * @param currentEmail the authenticated user's current email (from JWT principal)
      * @param newMobile    the mobile number the user wants to change to (raw, will be normalised)
@@ -535,11 +623,10 @@ public class AuthService {
         if (userRepository.existsByMobileNumber(normalizedMobile)) {
             throw new BadRequestException("This mobile number is already registered to another account");
         }
-        User user = userRepository.findByEmail(currentEmail)
+        userRepository.findByEmail(currentEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        String otp = otpService.generateAndSaveOtpForMobile(normalizedMobile, user.getEmail());
-        notificationService.sendMobileChangeOtp(user.getEmail(), otp);
+        twilioVerifyService.startVerification(normalizedMobile);
     }
 
     /**
@@ -560,10 +647,48 @@ public class AuthService {
         User user = userRepository.findByEmail(currentEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        otpService.validateOtpByMobile(normalizedMobile, otp);
+        twilioVerifyService.checkVerification(normalizedMobile, otp);
 
         user.setMobileNumber(normalizedMobile);
         userRepository.save(user);
+    }
+
+    /**
+     * Changes the account password for any authenticated user.
+     * Re-verifies the current password before accepting the new one and
+     * invalidates all refresh tokens so other devices must re-authenticate.
+     */
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BadRequestException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
+    }
+
+    /**
+     * Records an account-deletion request. The account is deactivated immediately;
+     * actual data erasure is handled by an out-of-band retention/erasure job.
+     */
+    @Transactional
+    public String requestAccountDeletion(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setActive(false);
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
+
+        return "DEL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private String generateUniqueReferralCode() {

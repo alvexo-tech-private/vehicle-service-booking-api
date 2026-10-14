@@ -1,0 +1,56 @@
+databaseChangeLog:
+  - changeSet:
+      id: 042-create-captcha-challenges-table
+      author: system
+      comment: >
+        OTP misuse prevention (BACKEND_SPECIFICATIONS_AND_REQUIREMENTS.md §2) —
+        short-lived, single-use numeric challenges required before /api/auth/request-otp
+        will issue an OTP.
+      changes:
+        - createTable:
+            tableName: captcha_challenges
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: captcha_id
+                  type: VARCHAR(36)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: code
+                  type: VARCHAR(5)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expiry_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: used
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            indexName: idx_captcha_challenges_captcha_id
+            tableName: captcha_challenges
+            columns:
+              - column:
+                  name: captcha_id
+      rollback:
+        - dropTable:
+            tableName: captcha_challenges
